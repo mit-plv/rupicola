@@ -44,34 +44,65 @@ Infix "~>" := scalar (at level 40, only parsing).
 Notation "[[ locals ]]" := ({| value := locals; _value_ok := _ |}) (only printing).
 
 Definition postcondition_func
-           {semantics : Semantics.parameters}
-           (spec : list word -> Semantics.mem -> Prop)
-           R tr :=
+           {semantics : Semantics.parameters} {T : Type}
+           (spec : T -> Semantics.trace -> list word -> Semantics.mem -> Prop)
+           (gallina_rets : T)
+           R
+  : Semantics.trace -> Semantics.mem -> list word -> Prop :=
   (fun (tr' : Semantics.trace) (mem' : Semantics.mem) (rets : list word) =>
-     tr = tr'
-     /\ sep (spec rets) R mem').
+     sep (spec gallina_rets tr' rets) R mem').
 
 Definition postcondition_func_norets
-           {semantics : Semantics.parameters} spec R tr :=
-  postcondition_func (fun r => sep (emp (r = nil)) (spec r)) R tr.
+           {semantics : Semantics.parameters} {T}
+           (spec : T -> Semantics.trace -> list word -> Semantics.mem -> Prop)
+           (gallina_rets : T)
+           R
+  : Semantics.trace -> Semantics.mem -> list word -> Prop :=
+  (fun (tr' : Semantics.trace) (mem' : Semantics.mem) (rets : list word) =>
+     (emp (rets = nil) * (spec gallina_rets tr' rets) * R)%sep mem').
 
-(* TODO: see if all uses of locals_post can be rephrased using retvars *)
 Definition postcondition_cmd
-           {semantics : Semantics.parameters}
-           locals_post spec retvars R tr :=
-  (fun (tr' : Semantics.trace) (mem' : Semantics.mem)
-       (locals : Semantics.locals) =>
-     tr = tr'
-     /\ locals_post locals
-     /\ exists rets,
-         map.getmany_of_list locals retvars = Some rets
-         /\ sep (spec rets) R mem').
+           {semantics : Semantics.parameters} {T}
+           (retvars : list string)
+           (spec : T -> Semantics.trace -> list word -> Semantics.mem -> Prop)
+           (gallina_rets : T)
+  : Semantics.trace -> Semantics.mem -> Semantics.locals -> Prop :=
+  fun tr' mem' locals' =>
+    exists rets,
+      map.getmany_of_list locals' retvars = Some rets
+      /\ spec gallina_rets tr' rets mem'.
 
-Notation "'find' body 'implementing' spec 'and-returning' retvars 'and-locals-post' locals_post 'with-locals' locals 'and-memory' mem 'and-trace' tr 'and-rest' R 'and-functions' fns" :=
-  (WeakestPrecondition.cmd
-     (WeakestPrecondition.call fns)
-     body tr mem locals
-     (postcondition_cmd locals_post spec retvars R tr)) (at level 0).
+Notation "'find' body 'from' gallina_impl 'implementing' spec 'with-locals-sep' locals 'and-memory-sep' mem 'and-trace' tr 'and-functions' fns" :=
+  (forall m l,
+      locals l ->
+      mem m ->
+      WeakestPrecondition.cmd
+        (WeakestPrecondition.call fns)
+        body tr m l
+        (spec gallina_impl)) (at level 0).
+
+Check
+  (forall fns tr (Rl : _ -> Prop) (Rm : _ -> Prop),
+   find cmd.skip
+   from (tt)
+   implementing (fun _ : unit =>
+                   fun tr' mem' locals' =>
+                     tr = tr' /\ Rm mem' /\ Rl locals')
+   with-locals-sep Rl
+   and-memory-sep Rm
+   and-trace tr
+   and-functions fns).
+Print WeakestPrecondition.call.
+
+Notation "'find-function' body 'from' gallina_impl 'implementing' spec 'and-returning' retvars 'and-memory-sep' mem 'and-trace' tr 'and-functions' fns" :=
+  (forall m l,
+      locals l ->
+      mem m ->
+      WeakestPrecondition.cmd
+        (WeakestPrecondition.call fns)
+        body tr m l
+        (postcondition_cmd retvars spec gallina_impl)) (at level 0).
+
 
 Notation "'liftexists' x .. y ',' P" :=
   (Lift1Prop.ex1
@@ -83,7 +114,7 @@ Notation "'liftexists' x .. y ',' P" :=
 
 (* precondition is more permissively handled than postcondition in order to
    non-separation-logic (or multiple separation-logic) preconditions *)
-Notation "'forall!' x .. y ',' pre '===>' fname '@' args 'returns' rets '===>' post" :=
+Notation "'forall!' x .. y ',' pre '===>' fname '@' args 'returns' retvars '===>' post" :=
 (fun functions =>
    (forall x,
        .. (forall y,
@@ -91,7 +122,7 @@ Notation "'forall!' x .. y ',' pre '===>' fname '@' args 'returns' rets '===>' p
                 pre R mem ->
                 WeakestPrecondition.call
                   functions fname tr mem args
-                  (postcondition_func (fun rets => post) R tr)) ..))
+                  (postcondition_func post retvars)) ..))
      (x binder, y binder, only parsing, at level 199).
 
 Example spec_example_withrets {semantics : Semantics.parameters}
@@ -99,9 +130,13 @@ Example spec_example_withrets {semantics : Semantics.parameters}
   (forall! (pa : address) (a b : word),
       (sep (pa ~> a))
         ===>
-        "example" @ [pa; b] returns r
+        "example" @ [pa; b] returns ["r"]
         ===>
-        (liftexists x, emp (r = [x]) * (pa ~> x))%sep).
+        (fun tr mem locals =>
+           liftexists x R,
+           (emp ((Var "r" x * R)%sep locals)
+                * (pa ~> x)%sep) mem
+           emp (r = [x]) * (pa ~> x))%sep).
 Example spec_example_norets {semantics : Semantics.parameters}
   : spec_of "example" :=
      (forall! (pa : address) (a b : word),

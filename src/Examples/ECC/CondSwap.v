@@ -26,17 +26,23 @@ Section Compile.
       (* tmp is a strictly temporary variable, confined to one part of the
          if-clause; it gets unset after use *)
       map.get locals tmp = None ->
+      (*
+      (Var tmp_var (word.of_Z 0))
+        * Var swap_var (word.of_Z (Z.b2z swap)
+        * Var x_var x_ptr * Var y_var y_ptr * Rl)%sep (map.put locals tmp_var (word.of_Z 0)) ->
+        *)
       (Data x_ptr x * Data y_ptr y * R')%sep mem ->
       let v := cswap swap x y in
       (let head := v in
+       forall locals,
+         (Var swap_var (word.of_Z (Z.b2z swap)
+                        * Var x_var (fst (cswap swap x_ptr y_ptr))
+                        * Var y_var (snd (cswap swap x_ptr y_ptr)) * Rl)%sep locals ->
        (find k_impl
         implementing (pred (k head))
         and-returning retvars
         and-locals-post locals_ok
-        with-locals
-               (map.put (map.put locals
-                                 x_var (fst (cswap swap x_ptr y_ptr)))
-                        y_var (snd (cswap swap x_ptr y_ptr)))
+        with-locals locals
         and-memory mem and-trace tr and-rest R
         and-functions functions)) ->
       (let head := v in
