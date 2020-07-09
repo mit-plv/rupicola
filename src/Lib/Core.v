@@ -205,3 +205,10 @@ Module Z.
   Lemma lxor_xorb a b : Z.lxor (Z.b2z a) (Z.b2z b) = Z.b2z (xorb a b).
   Proof. destruct a, b; reflexivity. Qed.
 End Z.
+
+Section Var.
+  Context {semantics : Semantics.parameters}.
+  Definition Var (name : string) (value : word)
+    : Semantics.locals -> Prop :=
+    eq (map.put map.empty name value).
+End Var.

@@ -5,10 +5,6 @@ Section Var.
   Context {semantics : Semantics.parameters}
           {semantics_ok : Semantics.parameters_ok semantics}.
 
-  Definition Var (name : string) (value : word)
-    : Semantics.locals -> Prop :=
-    eq (map.put map.empty name value).
-
   Lemma Var_get l name value R :
     (Var name value * R)%sep l ->
     map.get l name = Some value.

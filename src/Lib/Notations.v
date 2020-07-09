@@ -45,34 +45,27 @@ Notation "[[ locals ]]" := ({| value := locals; _value_ok := _ |}) (only printin
 
 Definition postcondition_func
            {semantics : Semantics.parameters} {T : Type}
-           (spec : T -> Semantics.trace -> list word -> Semantics.mem -> Prop)
-           (gallina_rets : T)
-           R
+           (spec : T -> list word -> Semantics.mem -> Prop)
+           (gallina_body : T)
+           tr R
   : Semantics.trace -> Semantics.mem -> list word -> Prop :=
   (fun (tr' : Semantics.trace) (mem' : Semantics.mem) (rets : list word) =>
-     sep (spec gallina_rets tr' rets) R mem').
-
-Definition postcondition_func_norets
-           {semantics : Semantics.parameters} {T}
-           (spec : T -> Semantics.trace -> list word -> Semantics.mem -> Prop)
-           (gallina_rets : T)
-           R
-  : Semantics.trace -> Semantics.mem -> list word -> Prop :=
-  (fun (tr' : Semantics.trace) (mem' : Semantics.mem) (rets : list word) =>
-     (emp (rets = nil) * (spec gallina_rets tr' rets) * R)%sep mem').
+     tr = tr' /\
+     sep (spec gallina_body rets) R mem').
 
 Definition postcondition_cmd
            {semantics : Semantics.parameters} {T}
-           (retvars : list string)
-           (spec : T -> Semantics.trace -> list word -> Semantics.mem -> Prop)
-           (gallina_rets : T)
+           (retvars : list string) tr
+           (spec : T -> list word -> Semantics.mem -> Prop)
+           (gallina_body : T)
   : Semantics.trace -> Semantics.mem -> Semantics.locals -> Prop :=
   fun tr' mem' locals' =>
+    tr = tr' /\
     exists rets,
       map.getmany_of_list locals' retvars = Some rets
-      /\ spec gallina_rets tr' rets mem'.
+      /\ spec gallina_body rets mem'.
 
-Notation "'find' body 'from' gallina_impl 'implementing' spec 'with-locals-sep' locals 'and-memory-sep' mem 'and-trace' tr 'and-functions' fns" :=
+Notation "'find' body 'from' gallina_impl 'with-locals-sep' locals 'and-memory-sep' mem 'and-trace' tr 'and-functions' fns 'implementing' spec" :=
   (forall m l,
       locals l ->
       mem m ->
@@ -81,28 +74,21 @@ Notation "'find' body 'from' gallina_impl 'implementing' spec 'with-locals-sep' 
         body tr m l
         (spec gallina_impl)) (at level 0).
 
-Check
-  (forall fns tr (Rl : _ -> Prop) (Rm : _ -> Prop),
+Goal
+  (forall (p : Semantics.parameters)
+          fns tr (Rl : _ -> Prop) (Rm : _ -> Prop),
    find cmd.skip
    from (tt)
-   implementing (fun _ : unit =>
-                   fun tr' mem' locals' =>
-                     tr = tr' /\ Rm mem' /\ Rl locals')
    with-locals-sep Rl
    and-memory-sep Rm
    and-trace tr
-   and-functions fns).
-Print WeakestPrecondition.call.
-
-Notation "'find-function' body 'from' gallina_impl 'implementing' spec 'and-returning' retvars 'and-memory-sep' mem 'and-trace' tr 'and-functions' fns" :=
-  (forall m l,
-      locals l ->
-      mem m ->
-      WeakestPrecondition.cmd
-        (WeakestPrecondition.call fns)
-        body tr m l
-        (postcondition_cmd retvars spec gallina_impl)) (at level 0).
-
+   and-functions fns
+   implementing (fun _ : unit =>
+                   fun tr' mem' locals' =>
+                     tr = tr' /\ Rm mem' /\ Rl locals')).
+  repeat straightline.
+  auto.
+Qed.
 
 Notation "'liftexists' x .. y ',' P" :=
   (Lift1Prop.ex1
@@ -114,7 +100,7 @@ Notation "'liftexists' x .. y ',' P" :=
 
 (* precondition is more permissively handled than postcondition in order to
    non-separation-logic (or multiple separation-logic) preconditions *)
-Notation "'forall!' x .. y ',' pre '===>' fname '@' args 'returns' retvars '===>' post" :=
+Notation "'forall!' x .. y ',' pre '===>' fname '@' args ':=' gallina_body 'returns' retvars '===>' post" :=
 (fun functions =>
    (forall x,
        .. (forall y,
@@ -122,54 +108,79 @@ Notation "'forall!' x .. y ',' pre '===>' fname '@' args 'returns' retvars '===>
                 pre R mem ->
                 WeakestPrecondition.call
                   functions fname tr mem args
-                  (postcondition_func post retvars)) ..))
+                  (postcondition_func post gallina_body tr R)) ..))
      (x binder, y binder, only parsing, at level 199).
 
 Example spec_example_withrets {semantics : Semantics.parameters}
+        (example_gallina : Z -> Z -> Z)
   : spec_of "example" :=
+  let ExampleSpec
+      : word -> Z -> list word -> Semantics.mem -> Prop :=
+      (fun pa result rets =>
+         liftexists x,
+         (emp (rets = [x] /\ word.unsigned x = result)
+          * (pa ~> x))%sep) in
   (forall! (pa : address) (a b : word),
       (sep (pa ~> a))
         ===>
-        "example" @ [pa; b] returns ["r"]
+        "example" @ [pa; b]
+          := (example_gallina (word.unsigned a) (word.unsigned b))
+        returns ["r"]
         ===>
-        (fun tr mem locals =>
-           liftexists x R,
-           (emp ((Var "r" x * R)%sep locals)
-                * (pa ~> x)%sep) mem
-           emp (r = [x]) * (pa ~> x))%sep).
+        ExampleSpec pa).
 Example spec_example_norets {semantics : Semantics.parameters}
+        (example_gallina : Z -> Z -> Z)
   : spec_of "example" :=
-     (forall! (pa : address) (a b : word),
-         (sep (pa ~> a))
-           ===>
-           "example" @ [pa; b] returns r
-           ===>
-           (emp (r = []) * (pa ~> word.add a b))%sep).
+  let ExampleSpec
+      : word -> Z -> list word -> Semantics.mem -> Prop :=
+      (fun pa result rets =>
+         (emp (rets = [])
+          * (liftexists x,
+             emp (word.unsigned x = result)
+             * (pa ~> x)))%sep) in
+  (forall! (pa : address) (a b : word),
+      (sep (pa ~> a))
+        ===>
+        "example" @ [pa; b]
+          := (example_gallina (word.unsigned a) (word.unsigned b))
+        returns []
+        ===>
+        ExampleSpec pa).
 
 (* shorthand for no return values *)
-Notation "'forall!' x .. y ',' pre '===>' fname '@' args '===>' post" :=
-(fun functions =>
-   (forall x,
-       .. (forall y,
-              forall R tr mem,
-                pre R mem ->
-                WeakestPrecondition.call
-                  functions fname tr mem args
-                  (postcondition_func_norets post R tr)) ..))
-     (x binder, y binder, only parsing, at level 199).
+Notation "'forall!' x .. y ',' pre '===>' fname '@' args ':=' gallina_body '===>' post" :=
+  (fun functions =>
+     (forall x,
+         .. (forall y,
+                forall R tr mem,
+                  pre R mem ->
+                  WeakestPrecondition.call
+                    functions fname tr mem args
+                    (postcondition_func
+                       (fun t rets => emp (rets = nil) * post t rets)%sep
+                       gallina_body tr R)) ..))
+    (x binder, y binder, only parsing, at level 199).
 
 (* N.B. postconditions with no return values still need to take in an argument
    for return values to make types line up. However, the shorthand notation inserts
    a clause to the postcondition saying the return values are nil, so the
    postcondition does not need to ensure this. *)
 Example spec_example_norets_short {semantics : Semantics.parameters}
+        (example_gallina : Z -> Z -> Z)
   : spec_of "example" :=
+  let ExampleSpec
+      : word -> Z -> list word -> Semantics.mem -> Prop :=
+      (fun pa result rets =>
+         liftexists x,
+         (emp (word.unsigned x = result)
+          * (pa ~> x))%sep) in
   (forall! (pa : address) (a b : word),
       (sep (pa ~> a))
         ===>
         "example" @ [pa; b]
+          := (example_gallina (word.unsigned a) (word.unsigned b))
         ===>
-        (fun _ => pa ~> word.add a b)%sep).
+        ExampleSpec pa).
 
 (* unify short and long notations for functions without return values (fails if
    spec_example_norets and spec_example_norets_short are not equivalent) *)

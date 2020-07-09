@@ -10,17 +10,27 @@ Section with_semantics.
   Lemma compile_skip :
     forall (locals: Semantics.locals) (mem: Semantics.mem)
            (locals_ok : _ -> Prop)
-           tr retvars rets R functions T
+           tr rets R R' functions T
            (pred: T -> list word -> _ -> Prop) head,
       locals_ok locals ->
-      map.getmany_of_list locals retvars = Some rets ->
-      sep (pred head rets) R mem ->
+      Lift1Prop.impl1 R' (pred head rets * R)%sep ->
       (find cmd.skip
-       implementing (pred head)
-       and-returning retvars
-       and-locals-post locals_ok
-       with-locals locals and-memory mem and-trace tr and-rest R
-       and-functions functions).
+       from head
+       with-locals-sep locals_ok
+       and-memory-sep R'
+       and-trace tr and-functions functions
+       implementing pred).
+  (forall (p : Semantics.parameters)
+          fns tr (Rl : _ -> Prop) (Rm : _ -> Prop),
+   find cmd.skip
+   from (tt)
+   with-locals-sep Rl
+   and-memory-sep Rm
+   and-trace tr
+   and-functions fns
+   implementing (fun _ : unit =>
+                   fun tr' mem' locals' =>
+                     tr = tr' /\ Rm mem' /\ Rl locals')).
   Proof.
     intros.
     repeat straightline.
