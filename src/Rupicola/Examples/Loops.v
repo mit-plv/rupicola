@@ -28,8 +28,96 @@ Section Ex.
     destruct Z_lt_le_dec; lia.
   Qed.
 
+  (* FIXME move *)
+  Lemma map_as_mutating_ranged_for {A} `{HasDefault A} Vfrom Vto Vxs xs:
+    forall (f: A -> A),
+      0 <= Z.of_nat (Datatypes.length xs) < 2 ^ Semantics.width ->
+      List.map f xs =
+      let/n from as Vfrom := word.of_Z 0 in
+      let/n to as Vto := word.of_Z (Z.of_nat (List.length xs)) in
+      ranged_for_u from to
+                   (fun xs tok idx _ =>
+                      let/n x := ListArray.get xs idx in
+                      let/n x := f x in
+                      let/n xs as Vxs := ListArray.put xs idx x in
+                      (tok, xs))
+                   xs.
+  Proof.
+    intros.
+    apply map_as_mutating_ranged_for_u; unfold nlet; eauto.
+    { unfold ListArray.get, ListArray.put, cast, Convertible_word_nat;
+        simpl; intros.
+      erewrite nth_error_nth; eauto. }
+  Qed.
+
+  Lemma sizedlistarray_len_eq :
+    forall ptr wlen xs R mem,
+      let len := Z.to_nat (word.unsigned (word := word) wlen) in
+      (sizedlistarray_value AccessWord ptr len xs ⋆ R) mem ->
+      wlen = word.of_Z (word := word) (Z.of_nat (Datatypes.length xs)).
+  Proof.
+    unfold sizedlistarray_value.
+    intros * H; apply sep_assoc, sep_emp_l in H.       (* FIXME *)
+    destruct H as (-> & H).
+    pose proof word.unsigned_range wlen.
+    rewrite Z2Nat.id, word.of_Z_unsigned; eauto || lia.
+  Qed.
+
+  Lemma sizedlistarray_len_bounded :
+    forall ptr wlen xs R mem,
+      let len := Z.to_nat (word.unsigned (word := word) wlen) in
+      (sizedlistarray_value AccessWord ptr len xs ⋆ R) mem ->
+      Z.of_nat (Datatypes.length xs) < 2 ^ Semantics.width.
+  Proof.
+    intros * (-> & H)%sep_assoc%sep_emp_l.       (* FIXME *)
+    pose proof word.unsigned_range wlen.
+    subst len; rewrite Z2Nat.id; eauto || lia.
+  Qed.
+
+  Hint Resolve sizedlistarray_len_eq : compiler_cleanup.
+  Hint Resolve sizedlistarray_len_bounded : compiler_cleanup.
+
   Instance HasDefault_word : HasDefault word :=
     word.of_Z 0.
+
+  Definition list_incr (a1: ListArray.t word) :=
+    let/n a1 := List.map (fun w => word.add w (word.of_Z 1)) a1 in
+    a1.
+
+  Instance spec_of_sizedlist_incr : spec_of "sizedlist_incr" :=
+    fnspec! "sizedlist_incr" (len: word) (a1_ptr : address) /
+          (a1: ListArray.t word) R,
+    { requires tr mem :=
+        (sizedlistarray_value
+           AccessWord a1_ptr (Z.to_nat (word.unsigned len)) a1 ⋆ R) mem;
+      ensures tr' mem' :=
+        tr' = tr /\
+        let res := list_incr a1 in
+        (sizedlistarray_value
+           AccessWord a1_ptr (Z.to_nat (word.unsigned len)) res ⋆ R) mem' }.
+
+  Derive sizedlist_incr_body SuchThat
+         (defn! "sizedlist_incr"("len", "a1") { sizedlist_incr_body },
+          implements list_incr)
+         As sizedlist_incr_correct.
+  Proof.
+    compile_setup.
+    repeat compile_step.
+
+    erewrite map_as_mutating_ranged_for with (Vxs := "a1") (Vfrom := "from") (Vto := "to");
+      repeat compile_step.
+
+    replace (word.of_Z (Z.of_nat (Datatypes.length a1))) with len;
+      repeat compile_step.
+
+    simple apply compile_nlet_as_nlet_eq.
+    apply compile_ranged_for_u with (loop_pred := (fun idx a1 tr' mem' locals' =>
+        tr' = tr /\
+        locals' = (∅[["len" ← len]][["a1" ← a1_ptr]][["from" ← idx]][["to" ← v0]]) /\
+        (sizedlistarray_value AccessWord a1_ptr (Z.to_nat (word.unsigned len)) a1 * R)%sep mem')).
+
+    all: repeat compile_step; try lia; compile_done.
+  Qed.
 
   Program Definition vect_memcpy {n1 n2} (len: word)
           (a1: VectorArray.t word n1)
