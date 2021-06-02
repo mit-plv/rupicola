@@ -813,6 +813,9 @@ Ltac cbn_array :=
   change (Z.of_nat 4%nat) with (4%Z) in *;
   change (Z.of_nat 8%nat) with (8%Z) in *.
 
+Instance Convertible_Z_nat : Convertible Z nat :=
+  fun w => Z.to_nat w.
+
 Instance Convertible_word_nat {s: Semantics.parameters} : Convertible word nat :=
   fun w => Z.to_nat (word.unsigned w).
 
