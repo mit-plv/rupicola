@@ -1403,7 +1403,7 @@ Ltac compile_done :=
   match goal with
   | _ =>
     idtac "Compilation incomplete.";
-    idtac "You may need to add new compilation lemmas using `Hint Extern 1 => simple eapply … : compiler` or to tell Rupicola about your custom bindings using `Hint Extern 2 (IsRupicolaBinding (xlet _ _ _)) => exact true : typeclass_instances`."
+    idtac "You may need to add new compilation lemmas using `Hint Extern 1 => simple eapply …; shelve : compiler` or to tell Rupicola about your custom bindings using `Hint Extern 2 (IsRupicolaBinding (xlet _ _ _)) => exact true : typeclass_instances`."
   end.
 
 (* only apply compile_step when repeat_compile_step solves all the side
