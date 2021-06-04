@@ -550,6 +550,10 @@ Section ZRange.
     - rewrite IHlen. repeat (lia || f_equal).
   Qed.
 
+  Lemma z_range'_length len:
+    forall z0, List.length (z_range' z0 len) = len.
+  Proof. induction len; simpl; try rewrite IHlen; eauto. Qed.
+
   Definition z_range from to :=
     z_range' from (Z.to_nat (to - from)).
 
@@ -615,6 +619,18 @@ Section ZRange.
   Proof.
     intros; replace to with (to - 1 + 1) at 1 by lia.
     apply z_range_snoc1; lia.
+  Qed.
+
+  Lemma z_range_length from to:
+    List.length (z_range from to) = Z.to_nat (to - from).
+  Proof.
+    apply z_range'_length.
+  Qed.
+
+  Lemma z_range_length_nat n:
+    List.length (z_range 0 (Z.of_nat n)) = n.
+  Proof.
+    rewrite z_range_length, Z.sub_0_r, Nat2Z.id; reflexivity.
   Qed.
 End ZRange.
 
@@ -833,6 +849,14 @@ Section Properties.
       rewrite ranged_for_break_exit in H1 by lia; auto.
   Qed.
 
+  Lemma ranged_for_break_nonstop from to
+        (body: forall (acc: A) (idx: Z), from - 1 < idx < to -> A)
+        stop (a0: A):
+    stop a0 = false ->
+    (forall acc idx pr, stop acc = false -> stop (body acc idx pr) = false) ->
+    stop (ranged_for_break from to body stop a0) = false.
+  Proof. intros; apply ranged_for_break_ind; eauto. Qed.
+
   Definition ranged_for_widen_bounds {from idx from' to} :
     from - 1 < idx < from' ->
     from' <= to ->
@@ -938,6 +962,31 @@ Section FoldsAsLoops.
     apply (foldl_as_r_foldl' xs f []).
   Qed.
 
+  (** The way this lemma is phrased allows it to be used for all sorts of list
+      representations and get/put interfaces (using default values, dependent
+      types, etc.). **)
+
+  Lemma fold_left_as_ranged_for xs:
+    forall (f: A -> T -> A) f' a0,
+      (forall xs n acc x Hin,
+          List.nth_error xs n = Some x ->
+          f' acc (Z.of_nat n) Hin =
+          f acc x) ->
+      List.fold_left f xs a0 =
+      ranged_for_all 0 (Z.of_nat (List.length xs)) f' a0.
+  Proof.
+    intros * Hf'.
+    rewrite foldl_as_r_foldl, foldl_as_foldl_dep.
+    unfold ranged_for_all, ranged_for_break.
+    apply foldl_dep_Proper; eauto.
+    intros ?? idx ?? acc.
+    apply z_range_sound in h.
+    destruct (nth_error_lt_some xs (Z.to_nat idx)) as (? & Hnth); [ lia | ].
+    specialize (Hf' xs (Z.to_nat idx) acc x).
+    rewrite Z2Nat.id in Hf' by lia.
+    rewrite Hf' by eauto. rewrite Hnth; reflexivity.
+  Qed.
+
   Lemma map_as_mutating_rw_fold' xs:
     forall (xs0: list A) (f: A -> A),
       List.fold_left
@@ -979,31 +1028,9 @@ Section FoldsAsLoops.
     rewrite Z.sub_0_r, Nat2Z.id; reflexivity.
   Qed.
 
-  (** The way this lemma is phrased allows it to be used for all sorts of list
-      representations and get/put interfaces (using default values, dependent
-      types, etc.). **)
-
-  Lemma fold_left_as_ranged_for xs:
-    forall (f: A -> T -> A) f' a0,
-      (forall xs n acc x Hin,
-          List.nth_error xs n = Some x ->
-          f' acc (Z.of_nat n) Hin =
-          f acc x) ->
-      List.fold_left f xs a0 =
-      ranged_for_all 0 (Z.of_nat (List.length xs)) f' a0.
-  Proof.
-    intros * Hf'.
-    rewrite foldl_as_r_foldl, foldl_as_foldl_dep.
-    unfold ranged_for_all, ranged_for_break.
-    apply foldl_dep_Proper; eauto.
-    intros ?? idx ?? acc.
-    apply z_range_sound in h.
-    destruct (nth_error_lt_some xs (Z.to_nat idx)) as (? & Hnth); [ lia | ].
-    specialize (Hf' xs (Z.to_nat idx) acc x).
-    rewrite Z2Nat.id in Hf' by lia.
-    rewrite Hf' by eauto. rewrite Hnth; reflexivity.
-  Qed.
-
+  (* The reason we need a whole new induction here is that we read from the
+     mutated list (the accumulator), not the original list, so
+     `fold_left_as_ranged_for` doesn't apply directly. *)
   Lemma map_as_mutating_ranged_for_all xs:
     forall (f: A -> A) f',
       (forall xs n x Hin,
@@ -1067,7 +1094,7 @@ Section WithTok.
     Definition ranged_for' :=
       ranged_for_break
         from to
-        (fun acc idx pr =>
+        (fun acc idx pr => (* We always pass ExitToken.new: it's simpler and it's equivalent to passing (fst acc) *)
            body (snd acc) ExitToken.new idx pr)
         (fun tok_acc => ExitToken.get (fst tok_acc))
         (ExitToken.new, a0).

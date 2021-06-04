@@ -556,15 +556,24 @@ Section Vectors.
     - f_equal; assumption.
   Qed.
 
-  Lemma Vector_nth_hd_skipn {T n}:
+  Lemma Vector_to_list_nth {T n}:
     forall (f: Fin.t n) idx (v : Vector.t T n) (t0 : T),
       idx = proj1_sig (Fin.to_nat f) ->
-      Vector.nth v f = List.hd t0 (List.skipn idx (Vector.to_list v)).
+      Vector.nth v f = List.nth idx (Vector.to_list v) t0.
   Proof.
     induction f; cbn; intros; rewrite (Vector.eta v).
     - subst; reflexivity.
     - subst; destruct (Fin.to_nat f); cbn.
       erewrite IHf; reflexivity.
+  Qed.
+
+  Lemma Vector_nth_hd_skipn {T n}:
+    forall (f: Fin.t n) idx (v : Vector.t T n) (t0 : T),
+      idx = proj1_sig (Fin.to_nat f) ->
+      Vector.nth v f = List.hd t0 (List.skipn idx (Vector.to_list v)).
+  Proof.
+    intros; erewrite Vector_to_list_nth, <- nth_default_eq, List.hd_skipn_nth_default;
+      eauto.
   Qed.
 
   Lemma Vector_to_list_app {A n1 n2} :
