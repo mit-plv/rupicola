@@ -46,71 +46,129 @@ Module ListArray.
   Arguments t : clear implicits.
 End ListArray.
 
+Open Scope Z_scope.
+
+(* Q: Why is the following using typeclasses instead of modules?
+   A: Because the type of vectors is parametric in the length `n`, and modules are not first-class values. *)
+
+Module Elem.
+  Section with_parameters.
+    Context {semantics : Semantics.parameters}
+            {semantics_ok : Semantics.parameters_ok semantics}.
+
+    Class elem_info :=
+      { type : Type;
+        size : access_size.access_size;
+        repr : word -> type -> Semantics.mem -> Prop;
+        to_word : type -> word;
+        default : HasDefault type;
+
+        (* FIXME use truncated_word and load_of_sep/store_of_sep? *)
+
+        load_of_sep : forall addr value R (m: Semantics.mem),
+            sep (repr addr value) R m ->
+            Memory.load size m addr =
+            Some (to_word value);
+        store_of_sep : forall addr (oldvalue value: type) R m (post: _ -> Prop),
+            sep (repr addr oldvalue) R m ->
+            (forall m, sep (repr addr value) R m -> post m) ->
+            exists m1, Memory.store size m addr (to_word value) = Some m1 /\
+                  post m1 }.
+
+    Definition width {AI: elem_info} :=
+      Z.of_nat (@Memory.bytes_per Semantics.width size).
+  End with_parameters.
+
+  Ltac _cbv H :=
+    cbv beta iota delta [type size repr to_word default width] in (type of H).
+End Elem.
+
 Section with_parameters.
   Context {semantics : Semantics.parameters}
           {semantics_ok : Semantics.parameters_ok semantics}.
 
-  Open Scope Z_scope.
+  (* No 16 or 32 to avoid depending on two more word instances. *)
+  Inductive AccessSize := AccessByte | AccessWord.
 
-  Section GenericArray.
-    (* No 16 or 32 to avoid depending on two more word instances. *)
-    Inductive AccessSize := AccessByte | AccessWord.
+  (* FIXME this is a slightly different formulation from the one in Bedrock2,
+       designed to line up with store_word_of_sep.  Move to Bedrock2? *)
+  Lemma store_one_of_sep:
+    forall (addr: word) (oldvalue value: byte) R m (post : _ -> Prop),
+      sep (ptsto addr oldvalue) R m ->
+      (forall m : Semantics.mem, sep (ptsto addr value) R m -> post m) ->
+      exists m1, Memory.store access_size.one m addr (word_of_byte value) = Some m1 /\ post m1.
+  Proof.
+    intros addr oldvalue value R m post **.
+    destruct (store_one_of_sep addr oldvalue (word_of_byte value) R m post);
+      try rewrite to_byte_of_byte_nowrap; eauto.
+  Qed.
 
-    Record access_info :=
-      { ai_type : Type;
-        ai_size : access_size.access_size;
-        ai_repr : word -> ai_type -> Semantics.mem -> Prop;
-        ai_to_word : ai_type -> word;
-        ai_default : HasDefault ai_type;
-        ai_width := Z.of_nat (@Memory.bytes_per Semantics.width ai_size) }.
+  Definition _elem_info asize :=
+    match asize with
+    | AccessByte =>   {| Elem.size := access_size.one;
+                        Elem.type := byte;
+                        Elem.repr := scalar8;
+                        Elem.default := Byte.x00;
+                        Elem.to_word v := word_of_byte v;
+                        Elem.load_of_sep := load_one_of_sep;
+                        Elem.store_of_sep := store_one_of_sep |}
+    | AccessWord =>   {| Elem.size := access_size.word;
+                        Elem.type := word;
+                        Elem.repr := scalar;
+                        Elem.default := word.of_Z 0;
+                        Elem.to_word v := v;
+                        Elem.load_of_sep := load_word_of_sep;
+                        Elem.store_of_sep := store_word_of_sep |}
+    end.
+End with_parameters.
 
-    Local Definition _access_info asize :=
-      match asize with
-      | AccessByte => {| ai_size := access_size.one;
-                        ai_type := byte;
-                        ai_repr := scalar8;
-                        ai_default := Byte.x00;
-                        ai_to_word v := word_of_byte v |}
-      | AccessWord => {| ai_size := access_size.word;
-                        ai_type := word;
-                        ai_repr := scalar;
-                        ai_default := word.of_Z 0;
-                        ai_to_word v := v |}
-      end.
+Module GenericArray.
+  Section with_parameters.
+    Context {semantics : Semantics.parameters}
+            {semantics_ok : Semantics.parameters_ok semantics}.
+
+    Context {sz: AccessSize}.
+    Let EI := _elem_info sz.
+    Local Existing Instance EI.
+
+    Notation V := Elem.type.
+
+    Class array_info :=
+      { A: Type;
+        K: Type;
+        to_list: A -> list V;
+        K_to_nat: Convertible K nat;
+
+        array_repr a_ptr a :=
+          (array Elem.repr (word.of_Z Elem.width) a_ptr (to_list a));
+
+        get: A -> K -> V;
+        put: A -> K -> V -> A;
+        repr: address -> A -> Semantics.mem -> Prop;
+
+        Hget: forall a idx,
+            get a idx = nth (K_to_nat idx) (to_list a) (get a idx);
+        Hrw: forall a_ptr a,
+            Lift1Prop.iff1 (repr a_ptr a) (array_repr a_ptr a);
+
+        Hput: forall a idx val,
+            (K_to_nat idx < List.length (to_list a))%nat ->
+            to_list (put a idx val) =
+            replace_nth (K_to_nat idx) (to_list a) val;
+        Hgetput: forall a idx val,
+            (K_to_nat idx < List.length (to_list a))%nat ->
+            get (put a idx val) idx = val }.
 
     (* Definition awidth {T} `{ak: access_kind T} : Z := *)
     (*   Z.of_nat (@Memory.bytes_per Semantics.width a_size). *)
 
-    Context (sz: AccessSize).
-    Notation ai := (_access_info sz).
-    Notation V := ai.(ai_type).
-
-    Context
-      {A K}
-      (to_list: A -> list V)
-      (K_to_nat: Convertible K nat)
-      (get: A -> K -> V)
-      (put: A -> K -> V -> A)
-      (repr: address -> A -> Semantics.mem -> Prop).
-
-    Definition array_repr a_ptr a :=
-      (array ai.(ai_repr) (word.of_Z ai.(ai_width)) a_ptr (to_list a)).
+    Context {AI: array_info}.
 
     Notation K_to_word x := (word.of_Z (Z.of_nat (K_to_nat x))).
 
     Context (a : A) (a_ptr : word) (a_var : string)
             (val: V) (val_var: string)
             (idx : K) (idx_var : string).
-
-    Context
-      (Hget: forall a,
-         exists default,
-           get a idx =
-           List.hd default (List.skipn (K_to_nat idx) (to_list a)))
-      (Hrw:
-         Lift1Prop.iff1
-           (repr a_ptr a)
-           (array_repr a_ptr a)).
 
     Definition offset base idx width :=
       (expr.op bopname.add base (expr.op bopname.mul width idx)).
@@ -120,7 +178,7 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl : cmd}
         R (var : string),
 
-        Z.of_nat (K_to_nat idx) < Z.of_nat (Datatypes.length (to_list a)) ->
+        (K_to_nat idx < Datatypes.length (to_list a))%nat ->
 
         sep (repr a_ptr a) R mem ->
         map.get locals a_var = Some a_ptr ->
@@ -129,7 +187,7 @@ Section with_parameters.
         (let v := v in
          <{ Trace := tr;
             Memory := mem;
-            Locals := map.put locals var (ai.(ai_to_word) v);
+            Locals := map.put locals var (Elem.to_word v);
             Functions := functions }>
          k_impl
          <{ pred (k v eq_refl) }>) ->
@@ -140,88 +198,68 @@ Section with_parameters.
         cmd.seq
           (cmd.set
              var
-             (expr.load (ai.(ai_size))
+             (expr.load (Elem.size)
                         (offset (expr.var a_var)
                                 (expr.var idx_var)
-                                (expr.literal ai.(ai_width)))))
+                                (expr.literal Elem.width))))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       cbn; intros Hlt *.
       pose proof word.unsigned_range (K_to_word idx) as (Hge & _).
-      destruct (Hget a) as [default Hget0].
 
-      exists (ai.(ai_to_word) (get a idx)); split; cbn; [ | assumption ].
+      exists (Elem.to_word (get a idx)); split; cbn; [ | assumption ].
       exists a_ptr; split; [ eassumption | ]; cbn.
       exists (K_to_word idx); split; [ eassumption | ]; cbn.
       eexists; split; [ | reflexivity ].
 
       seprewrite_in Hrw H0.        (* FIXME seprewrite shouldn't rename *)
       (* FIXME: BEDROCK2: Adding an extra "_" at the end shelves an inequality *)
-      match goal with
+      lazymatch goal with
       | [ H: (array_repr _ _ ⋆ _) ?mem |- _ ] =>
         unfold array_repr in *;
           seprewrite_in open_constr:(array_index_nat_inbounds
-                                       _ _ (default := default) _ _ (K_to_nat idx)) H
+                                       _ _ (default := get a idx) _ _ (K_to_nat idx)) H
       end.
-      { lia. }
+      { eassumption. }
 
       match goal with
       | [ H: context[word.of_Z (_ * _)] |- _ ] =>
         rewrite word.ring_morph_mul, !word.of_Z_unsigned in H by assumption
       end.
 
-      rewrite Hget0.
-
-      clear put Hget Hrw.
-      destruct sz; cbv [_access_info ai_type ai_size ai_repr ai_to_word ai_width] in *.
-      - eapply load_one_of_sep; ecancel_assumption.
-      - eapply load_word_of_sep; ecancel_assumption.
+      rewrite Hget.
+      eapply Elem.load_of_sep.
+      rewrite <- nth_default_eq, List.hd_skipn_nth_default.
+      cbn in *; ecancel_assumption.
     Qed.
 
-    Context (Hput:
-               (K_to_nat idx < List.length (to_list a))%nat ->
-               to_list (put a idx val) =
-               List.app
-                 (List.firstn (K_to_nat idx) (to_list a))
-                 (val :: List.skipn (S (K_to_nat idx)) (to_list a)))
-            (Hgetput:
-               (K_to_nat idx < List.length (to_list a))%nat ->
-               get (put a idx val) idx = val)
-            (Hrw_put:
-               Lift1Prop.iff1
-                 (repr a_ptr (put a idx val))
-                 (array_repr a_ptr (put a idx val))).
-
-    Local Lemma compile_array_put_length :
+    Lemma _compile_array_put_length :
       (K_to_nat idx < Datatypes.length (to_list a))%nat ->
       (K_to_nat idx < List.length (to_list (put a idx val)))%nat.
     Proof.
       intros; rewrite Hput by assumption.
-      rewrite List.app_length, List.firstn_length_le by lia.
-      cbn [List.length]; rewrite List.length_skipn.
-      lia.
+      rewrite replace_nth_length; assumption.
     Qed.
 
-    Local Lemma compile_array_put_firstn :
+    Lemma _compile_array_put_firstn :
       (K_to_nat idx < Datatypes.length (to_list a))%nat ->
       List.firstn (K_to_nat idx) (to_list (put a idx val)) =
       List.firstn (K_to_nat idx) (to_list a).
     Proof.
-      intros; rewrite Hput by lia.
-      rewrite List.firstn_app.
-      rewrite List.firstn_firstn, Min.min_idempotent.
+      intros; rewrite Hput, replace_nth_eqn by lia.
+      rewrite List.firstn_app, List.firstn_firstn, Min.min_idempotent.
       rewrite List.firstn_length_le by lia.
       rewrite Nat.sub_diag; cbn [List.firstn]; rewrite app_nil_r.
       reflexivity.
     Qed.
 
-    Local Lemma compile_array_put_skipn :
+    Lemma _compile_array_put_skipn :
       (K_to_nat idx < Datatypes.length (to_list a))%nat ->
       List.skipn (S (K_to_nat idx)) (to_list (put a idx val)) =
       List.skipn (S (K_to_nat idx)) (to_list a).
     Proof.
-      intros; rewrite Hput by lia.
+      intros; rewrite Hput, replace_nth_eqn by lia.
       change (val :: ?tl) with (List.app [val] tl).
       rewrite List.app_assoc, List.skipn_app, List.skipn_all, List.app_nil_l, List.skipn_skipn;
         rewrite !List.app_length, List.firstn_length_le, (Nat.add_comm _ 1) by lia.
@@ -240,7 +278,7 @@ Section with_parameters.
       sep (repr a_ptr a) R mem ->
       map.get locals a_var = Some a_ptr ->
       map.get locals idx_var = Some (K_to_word idx) ->
-      map.get locals val_var = Some (ai.(ai_to_word) val) ->
+      map.get locals val_var = Some (Elem.to_word val) ->
 
       (let v := v in
        forall mem',
@@ -257,20 +295,19 @@ Section with_parameters.
          Functions := functions }>
       cmd.seq
         (cmd.store
-           (ai.(ai_size))
+           (Elem.size)
            (offset (expr.var a_var)
                    (expr.var idx_var)
-                   (expr.literal ai.(ai_width)))
+                   (expr.literal Elem.width))
            (expr.var val_var))
         k_impl
       <{ pred (nlet_eq [var] v k) }>.
     Proof.
       cbn; intros Hlt *.
-      pose proof compile_array_put_length as Hputlen.
-      pose proof compile_array_put_firstn as Hputfst.
-      pose proof compile_array_put_skipn as Hputskp.
+      pose proof _compile_array_put_length as Hputlen.
+      pose proof _compile_array_put_firstn as Hputfst.
+      pose proof _compile_array_put_skipn as Hputskp.
       pose proof word.unsigned_range (K_to_word idx) as (Hge & _).
-      destruct (Hget (put a idx val)) as [default Hget0].
       eexists; split; cbn.
 
       { eexists; split; [ eassumption | ]; cbn.
@@ -280,11 +317,12 @@ Section with_parameters.
         { eexists; split; [ eassumption | reflexivity ]. }
         { seprewrite_in Hrw H0.
 
-          match goal with
+          lazymatch goal with
           | [ H: (array_repr _ _ ⋆ _) ?mem |- _ ] =>
             unfold array_repr in *;
               seprewrite_in open_constr:(array_index_nat_inbounds
-                                           _ _ (default := default) _ _ (K_to_nat idx)) H
+                                           Elem.repr _ (default := get a idx) _ _
+                                           (K_to_nat idx)) H
           end.
           { assumption. }
 
@@ -293,102 +331,116 @@ Section with_parameters.
             rewrite word.ring_morph_mul, !word.of_Z_unsigned in H by assumption
           end.
 
-          destruct sz;
-            cbv [_access_info ai_type ai_size ai_repr ai_to_word ai_width] in *.
+          eapply Elem.store_of_sep.
+          { ecancel_assumption. }
 
-          1: eapply store_one_of_sep; [ ecancel_assumption | ].
-          2: eapply store_word_of_sep; [ ecancel_assumption | ].
-
-          all: intros m Hm; apply H4; seprewrite Hrw_put.
-          all: seprewrite
-                 open_constr:(array_index_nat_inbounds
-                                _ _ (default := default)
-                                _ _ (K_to_nat idx));
+          intros m Hm; apply H4; seprewrite Hrw.
+          unfold array_repr;
+            once (seprewrite open_constr:(array_index_nat_inbounds
+                                            _ _ (default := get (put a idx val) idx)
+                                            _ _ (K_to_nat idx)));
             [ apply Hputlen; assumption | ].
-          all: rewrite <- Hget0, Hgetput, !Hputfst, !Hputskp by assumption.
-          all: repeat rewrite word.ring_morph_mul, !word.of_Z_unsigned by lia.
+          rewrite <- List.hd_skipn_nth_default, nth_default_eq.
+          rewrite <- Hget, Hgetput, !Hputfst, !Hputskp by assumption.
+          repeat rewrite word.ring_morph_mul, !word.of_Z_unsigned by lia.
 
-          1: rewrite to_byte_of_byte_nowrap in Hm.
-          all: try ecancel_assumption. } }
+          ecancel_assumption. } }
     Qed.
-  End GenericArray.
+  End with_parameters.
 
-  Section GenericVectorArray.
-    Context (sz: AccessSize).
-    Notation ai := (_access_info sz).
+  Ltac _cbv H :=
+    cbv beta iota delta [A K to_list K_to_nat array_repr get put repr].
+End GenericArray.
 
-    Context {K: Type}
-            {ConvNat: Convertible K nat}.
+Module GenericVectorArray.
+  Import GenericArray.
+
+  Section with_parameters.
+    Context {semantics : Semantics.parameters}
+            {semantics_ok : Semantics.parameters_ok semantics}.
+
+    Context {sz: AccessSize}.
+    Let EI := _elem_info sz.
+    Local Existing Instance EI.
+
+    Context {n: nat}.
+
+    Context {K0: Type}
+            {ConvNat: Convertible K0 nat}.
 
     Notation to_list := Vector.to_list.
-    Notation K_to_nat idx := (cast (proj1_sig (P:=fun idx0 : K => (cast idx0 < _)%nat) idx)).
+    Notation K_to_nat idx := (cast (proj1_sig (P:=fun idx0 : K0 => (cast idx0 < _)%nat) idx)).
     Notation K_to_word x := (word.of_Z (Z.of_nat (K_to_nat x))).
 
     Notation get a idx := (VectorArray.get a (proj1_sig idx) (proj2_sig idx)).
     Notation put a idx v := (VectorArray.put a (proj1_sig idx) (proj2_sig idx) v).
 
-    Definition vectorarray_value {n}
-               (addr: address) (a: VectorArray.t ai.(ai_type) n)
-      : Semantics.mem -> Prop :=
-      array ai.(ai_repr) (word.of_Z ai.(ai_width)) addr (to_list a).
-    Notation repr := vectorarray_value.
+    Definition repr n (addr: address) (a: VectorArray.t Elem.type n) : Semantics.mem -> Prop :=
+      array Elem.repr (word.of_Z Elem.width) addr (to_list a).
 
-    Lemma VectorArray_Hget {n}:
-      forall (a: VectorArray.t ai.(ai_type) n) idx,
-      exists default,
-        get a idx =
-        List.hd default (List.skipn (K_to_nat idx) (to_list a)).
+    Lemma Vector_to_list_nth {T}:
+      forall (f: Fin.t n) idx (v : Vector.t T n) (t0 : T),
+        idx = proj1_sig (Fin.to_nat f) ->
+        Vector.nth v f = List.nth idx (Vector.to_list v) t0.
     Proof.
-      intros. exists ai.(ai_default).
-      apply Vector_nth_hd_skipn.
+      induction f; cbn; intros; rewrite (Vector.eta v).
+      - subst; reflexivity.
+      - subst; destruct (Fin.to_nat f); cbn.
+        erewrite IHf; reflexivity.
+    Qed.
+
+    Program Definition info : array_info :=
+      {| A := VectorArray.t Elem.type n;
+         K := {idx0 : K0 | (cast idx0 < n)%nat};
+
+         GenericArray.to_list := to_list;
+         GenericArray.K_to_nat idx := K_to_nat idx;
+
+         GenericArray.get a idx := get a idx;
+         GenericArray.put a idx v := put a idx v;
+
+         GenericArray.repr addr a := repr n addr a
+      |}.
+
+    Next Obligation.
+    Proof.
+      simpl; unfold VectorArray.get.
+      apply Vector_to_list_nth; rewrite Fin.to_nat_of_nat; reflexivity.
+    Qed.
+
+    Next Obligation.
+    Proof. reflexivity. Qed.
+
+    Next Obligation.
+    Proof.
+      simpl.
+      unfold VectorArray.put, Vector.replace_order;
+        erewrite Vector_to_list_replace by reflexivity.
       rewrite Fin.to_nat_of_nat; reflexivity.
     Qed.
 
-    Lemma VectorArray_Hput {n} :
-      forall (a : VectorArray.t ai.(ai_type) n) (idx: {idx : K | (cast idx < n)%nat}) v,
-        to_list (put a idx v) =
-        List.app
-          (List.firstn (K_to_nat idx) (to_list a))
-          (v :: List.skipn (S (K_to_nat idx)) (to_list a)).
-    Proof.
-      unfold put.
-      destruct idx as [widx pr]; cbn [proj1_sig proj2_sig].
-      unfold cast in *.
-      intros.
-      unfold Vector.replace_order; erewrite Vector_to_list_replace by reflexivity.
-      rewrite <- replace_nth_eqn by (rewrite Vector_to_list_length; assumption).
-      rewrite Fin.to_nat_of_nat; reflexivity.
-    Qed.
-
-    Lemma VectorArray_Hgetput {n} :
-      forall (a : VectorArray.t ai.(ai_type) n) (idx: {idx : K | (cast idx < n)%nat}) v,
-        get (put a idx v) idx = v.
+    Next Obligation.
     Proof.
       unfold get, put, Vector.nth_order, Vector.replace_order.
       intros; apply Vector_nth_replace.
     Qed.
 
-    Lemma VectorArray_Hrw {n}:
-      forall addr (a: VectorArray.t ai.(ai_type) n),
-        Lift1Prop.iff1
-          (repr addr a)
-          (array_repr sz to_list addr a).
-    Proof. reflexivity. Qed.
+    Local Existing Instance info.
 
-    Lemma compile_vectorarray_get {n} {tr mem locals functions}
-          (a: VectorArray.t ai.(ai_type) n) (idx: K) pr:
+    Lemma compile_get {tr mem locals functions}
+          (a: VectorArray.t Elem.type n) (idx: K0) pr:
       let v := VectorArray.get a idx pr in
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
         R (a_ptr: address) a_var idx_var var,
 
-        sep (vectorarray_value a_ptr a) R mem ->
+        sep (repr n a_ptr a) R mem ->
         map.get locals a_var = Some a_ptr ->
         map.get locals idx_var = Some (word.of_Z (Z.of_nat (cast idx))) ->
 
         (let v := v in
          <{ Trace := tr;
             Memory := mem;
-            Locals := map.put locals var (ai.(ai_to_word) v);
+            Locals := map.put locals var (Elem.to_word v);
             Functions := functions }>
          k_impl
          <{ pred (k v eq_refl) }>) ->
@@ -400,36 +452,34 @@ Section with_parameters.
           (cmd.set
              var
              (expr.load
-                (ai.(ai_size))
+                (Elem.size)
                 (offset (expr.var a_var)
                         (expr.var idx_var)
-                        (expr.literal ai.(ai_width)))))
+                        (expr.literal Elem.width))))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       intros.
-      change v with
-          ((fun a idx => VectorArray.get a (proj1_sig idx) (proj2_sig idx))
-             a (exist (fun idx => cast idx < n)%nat idx pr)).
-      eapply (compile_array_get sz to_list (fun x => K_to_nat x));
-        eauto using VectorArray_Hget, VectorArray_Hrw.
-      { rewrite Vector_to_list_length. simpl; lia. }
+      change v with (get a (exist (fun idx => cast idx < n)%nat idx pr)).
+      eapply (compile_array_get (AI := info))
+        with (a := a) (idx := exist (fun idx0 : K0 => (cast idx0 < n)%nat) idx pr); eauto.
+      simpl; rewrite Vector_to_list_length; assumption.
     Qed.
 
-    Lemma compile_vectorarray_put {n} {tr mem locals functions}
-          (a: VectorArray.t ai.(ai_type) n) (idx: K) pr val:
+    Lemma compile_put {tr mem locals functions}
+          (a: VectorArray.t Elem.type n) (idx: K0) pr val:
       let v := VectorArray.put a idx pr val in
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
         R a_ptr a_var idx_var val_var var,
 
-        sep (vectorarray_value a_ptr a) R mem ->
+        sep (repr n a_ptr a) R mem ->
         map.get locals a_var = Some a_ptr ->
         map.get locals idx_var = Some (word.of_Z (Z.of_nat (cast idx))) ->
-        map.get locals val_var = Some (ai.(ai_to_word) val) ->
+        map.get locals val_var = Some (Elem.to_word val) ->
 
         (let v := v in
          forall mem',
-           sep (vectorarray_value a_ptr v) R mem' ->
+           sep (repr n a_ptr v) R mem' ->
            <{ Trace := tr;
               Memory := mem';
               Locals := locals;
@@ -442,35 +492,38 @@ Section with_parameters.
            Functions := functions }>
         cmd.seq
           (cmd.store
-             (ai.(ai_size))
+             (Elem.size)
              (offset (expr.var a_var)
                      (expr.var idx_var)
-                     (expr.literal ai.(ai_width)))
+                     (expr.literal Elem.width))
              (expr.var val_var))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       intros.
-      change v with
-          ((fun v idx val => VectorArray.put a (proj1_sig idx) (proj2_sig idx) val)
-             v (exist (fun idx => cast idx < n)%nat idx pr) val).
-      eapply (compile_array_put sz
-                to_list (fun x => K_to_nat x)
-                (fun a idx => get a idx)
-                (fun a idx v => put a idx v));
-        eauto using VectorArray_Hget, VectorArray_Hrw,
-        VectorArray_Hgetput, VectorArray_Hput.
-      rewrite Vector_to_list_length; assumption.
+      change v with (put a (exist (fun idx => cast idx < n)%nat idx pr) val).
+      simple eapply (compile_array_put (AI := info))
+        with (a := a) (val := val) (idx := exist (fun idx0 : K0 => (cast idx0 < n)%nat) idx pr); eauto.
+      simpl; rewrite Vector_to_list_length; assumption.
     Qed.
-  End GenericVectorArray.
+  End with_parameters.
+End GenericVectorArray.
 
-  Section GenericListArray.
-    Context (sz: AccessSize).
-    Context {HD: HasDefault (_access_info sz).(ai_type)}.
-    Notation ai := (_access_info sz).
+Module GenericListArray.
+  Import GenericArray.
+
+  Section with_parameters.
+    Context {semantics : Semantics.parameters}
+            {semantics_ok : Semantics.parameters_ok semantics}.
+
+    Context {sz: AccessSize}.
+    Let EI := _elem_info sz.
+    Local Existing Instance EI.
+    Notation V := Elem.type.
 
     Context {K: Type}
-            {ConvNat: Convertible K nat}.
+            {ConvNat: Convertible K nat}
+            {HD: HasDefault V}.
 
     Notation to_list x := x (only parsing).
     Notation K_to_nat idx := (@cast _ _ ConvNat idx).
@@ -479,66 +532,58 @@ Section with_parameters.
     Notation get a idx := (ListArray.get a idx).
     Notation put a idx v := (ListArray.put a idx v).
 
-    Definition listarray_value
-               (addr: address) (a: ListArray.t ai.(ai_type))
-      : Semantics.mem -> Prop :=
-      array ai.(ai_repr) (word.of_Z ai.(ai_width)) addr a.
-    Notation repr := listarray_value.
+    Definition repr (addr: address) (a: ListArray.t Elem.type) : Semantics.mem -> Prop :=
+      array Elem.repr (word.of_Z Elem.width) addr a.
 
-    Lemma ListArray_Hget:
-      forall (a: ListArray.t ai.(ai_type)) idx,
-      exists default,
-        get a idx =
-        List.hd default (List.skipn (K_to_nat idx) (to_list a)).
+    Program Definition info : array_info :=
+      {| A := ListArray.t Elem.type;
+         GenericArray.K := K;
+
+         GenericArray.to_list l := to_list l;
+         GenericArray.K_to_nat idx := K_to_nat idx;
+
+         GenericArray.get a idx := get a idx;
+         GenericArray.put a idx v := put a idx v;
+
+         GenericArray.repr addr a := repr addr a
+      |}.
+
+    Next Obligation.
     Proof.
-      intros. exists default.
-      unfold get; rewrite <- List.nth_default_eq.
-      apply List.hd_skipn_nth_default.
+      unfold ListArray.get.
+      generalize (K_to_nat idx) as i; induction a; simpl; intros;
+        destruct i; congruence.
     Qed.
 
-    Lemma ListArray_Hput :
-      forall (a : ListArray.t ai.(ai_type)) (idx: K) v,
-        (K_to_nat idx < Datatypes.length a)%nat ->
-        to_list (put a idx v) =
-        List.app
-          (List.firstn (K_to_nat idx) (to_list a))
-          (v :: List.skipn (S (K_to_nat idx)) (to_list a)).
+    Next Obligation.
     Proof.
-      unfold put; eauto using replace_nth_eqn.
+      reflexivity.
     Qed.
 
-    Lemma ListArray_Hgetput :
-      forall (a : ListArray.t ai.(ai_type)) (idx: K) v,
-        (K_to_nat idx < Datatypes.length a)%nat ->
-        get (put a idx v) idx = v.
+    Next Obligation.
     Proof.
       unfold get, put.
       intros; apply nth_replace_nth; (assumption || reflexivity).
     Qed.
 
-    Lemma ListArray_Hrw:
-      forall addr a,
-        Lift1Prop.iff1
-          (repr addr a)
-          (array_repr sz (fun x => to_list x) addr a).
-    Proof. reflexivity. Qed.
+    Local Existing Instance info.
 
-    Lemma compile_unsizedlistarray_get {tr mem locals functions}
-          (a: ListArray.t ai.(ai_type)) (idx: K):
+    Lemma compile_get {tr mem locals functions}
+          (a: ListArray.t Elem.type) (idx: K):
       let v := ListArray.get a idx in
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
         R (a_ptr: address) a_var idx_var var,
 
-        sep (listarray_value a_ptr a) R mem ->
+        sep (repr a_ptr a) R mem ->
         map.get locals a_var = Some a_ptr ->
         map.get locals idx_var = Some (word.of_Z (Z.of_nat (cast idx))) ->
 
-        Z.of_nat (cast idx) < Z.of_nat (Datatypes.length a) ->
+        (cast idx < Datatypes.length a)%nat ->
 
         (let v := v in
          <{ Trace := tr;
             Memory := mem;
-            Locals := map.put locals var (ai.(ai_to_word) v);
+            Locals := map.put locals var (Elem.to_word v);
             Functions := functions }>
          k_impl
          <{ pred (k v eq_refl) }>) ->
@@ -550,34 +595,34 @@ Section with_parameters.
           (cmd.set
              var
              (expr.load
-                (ai.(ai_size))
+                (Elem.size)
                 (offset (expr.var a_var)
                         (expr.var idx_var)
-                        (expr.literal ai.(ai_width)))))
+                        (expr.literal Elem.width))))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       intros.
-      eapply (compile_array_get sz id (fun x => K_to_nat x));
-        eauto using ListArray_Hget, ListArray_Hrw.
+      eapply (compile_array_get (AI := info))
+        with (a := a) (idx := idx); eauto.
     Qed.
 
-    Lemma compile_unsizedlistarray_put {tr mem locals functions}
-          (a: ListArray.t ai.(ai_type)) (idx: K) val:
+    Lemma compile_put {tr mem locals functions}
+          (a: ListArray.t Elem.type) (idx: K) val:
       let v := ListArray.put a idx val in
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
         R (a_ptr: address) a_var idx_var val_var var,
 
-        sep (listarray_value a_ptr a) R mem ->
+        sep (repr a_ptr a) R mem ->
         map.get locals a_var = Some a_ptr ->
         map.get locals idx_var = Some (word.of_Z (Z.of_nat (cast idx))) ->
-        map.get locals val_var = Some (ai.(ai_to_word) val) ->
+        map.get locals val_var = Some (Elem.to_word val) ->
 
-        Z.of_nat (K_to_nat idx) < Z.of_nat (List.length a) ->
+        (K_to_nat idx < List.length a)%nat ->
 
         (let v := v in
          forall mem',
-           sep (listarray_value a_ptr v) R mem' ->
+           sep (repr a_ptr v) R mem' ->
            <{ Trace := tr;
               Memory := mem';
               Locals := locals;
@@ -590,30 +635,36 @@ Section with_parameters.
            Functions := functions }>
         cmd.seq
           (cmd.store
-             (ai.(ai_size))
+             (Elem.size)
              (offset (expr.var a_var)
                      (expr.var idx_var)
-                     (expr.literal ai.(ai_width)))
+                     (expr.literal Elem.width))
              (expr.var val_var))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       intros.
-      eapply (compile_array_put sz id (fun x => K_to_nat x));
-        eauto using ListArray_Hget, ListArray_Hput,
-        ListArray_Hgetput, ListArray_Hrw.
-      unfold id; pose proof word.unsigned_range (K_to_word idx).
-      lia.
+      simple eapply (compile_array_put (AI := info))
+        with (a := a) (val := val) (idx := idx); eauto.
     Qed.
-  End GenericListArray.
+  End with_parameters.
+End GenericListArray.
 
-  Section GenericSizedListArray.
-    Context (sz: AccessSize).
-    Context {HD: HasDefault (_access_info sz).(ai_type)}.
-    Notation ai := (_access_info sz).
+Module GenericSizedListArray.
+  Import GenericArray.
+
+  Section with_parameters.
+    Context {semantics : Semantics.parameters}
+            {semantics_ok : Semantics.parameters_ok semantics}.
+
+    Context {sz: AccessSize}.
+    Let EI := _elem_info sz.
+    Local Existing Instance EI.
+    Notation V := Elem.type.
 
     Context {K: Type}
-            {ConvNat: Convertible K nat}.
+            {ConvNat: Convertible K nat}
+            {HD: HasDefault V}.
 
     Notation to_list x := x (only parsing).
     Notation K_to_nat idx := (@cast _ _ ConvNat idx).
@@ -622,43 +673,56 @@ Section with_parameters.
     Notation get a idx := (ListArray.get a idx).
     Notation put a idx v := (ListArray.put a idx v).
 
-    Definition sizedlistarray_value
-               (addr: address) (len: nat) (a: ListArray.t ai.(ai_type))
-      : Semantics.mem -> Prop :=
+    Definition repr (addr: address) (len: nat) (a: ListArray.t Elem.type) : Semantics.mem -> Prop :=
       sep (emp (List.length a = len))
-          (listarray_value sz addr a).
+          (GenericListArray.repr addr a).
 
-    Lemma sizedlistarray_value_of_array addr len a mem :
+    Lemma repr_of_array addr len a mem :
       List.length a = len ->
-      listarray_value sz addr a mem ->
-      sizedlistarray_value addr len a mem.
+      GenericListArray.repr addr a mem ->
+      repr addr len a mem.
     Proof. intros; apply sep_emp_l; eauto. Qed.
 
-    Lemma array_of_sizedlistarray_value addr len a mem :
-      sizedlistarray_value addr len a mem ->
-      listarray_value sz addr a mem.
+    Lemma array_of_repr addr len a mem :
+      repr addr len a mem ->
+      GenericListArray.repr addr a mem.
     Proof. intros H; apply sep_emp_l in H; intuition. Qed.
 
-    Lemma length_of_sizedlistarray_value addr len a mem :
-      sizedlistarray_value addr len a mem ->
+    Lemma length_of_repr addr len a mem :
+      repr addr len a mem ->
       List.length a = len.
     Proof. intros H; apply sep_emp_l in H; intuition. Qed.
 
-    Notation repr := sizedlistarray_value.
+    Program Definition info : array_info :=
+      {| A := ListArray.t Elem.type;
+         GenericArray.K := K;
 
-    Lemma SizedListArray_Hrw:
-      forall addr len (a: ListArray.t ai.(ai_type)),
-        List.length a = len ->
-        Lift1Prop.iff1
-          (repr addr len a)
-          (array_repr sz (fun x => to_list x) addr a).
+         GenericArray.to_list l := to_list l;
+         GenericArray.K_to_nat idx := K_to_nat idx;
+
+         GenericArray.get a idx := get a idx;
+         GenericArray.put a idx v := put a idx v;
+
+         GenericArray.repr addr a := repr addr (List.length a) a
+      |}.
+
+    Next Obligation.
     Proof.
-      unfold sizedlistarray_value.
-      red; intros; rewrite sep_emp_l; tauto.
+      apply GenericListArray.info_obligation_1.
+    Qed.
+
+    Next Obligation.
+    Proof.
+      unfold repr; intro; rewrite sep_emp_l; tauto.
+    Qed.
+
+    Next Obligation.
+    Proof.
+      apply GenericListArray.info_obligation_4; auto.
     Qed.
 
     Lemma SizedListArray_length :
-      forall addr len (a: ListArray.t ai.(ai_type)) mem R,
+      forall addr len (a: ListArray.t Elem.type) mem R,
         (repr addr len a * R)%sep mem -> List.length a = len.
     Proof.
       intros * H; unfold repr in H.
@@ -666,22 +730,22 @@ Section with_parameters.
       ecancel_assumption.
     Qed.
 
-    Lemma compile_sizedlistarray_get {len} {tr mem locals functions}
-          (a: ListArray.t ai.(ai_type)) (idx: K):
+    Lemma compile_get {len} {tr mem locals functions}
+          (a: ListArray.t Elem.type) (idx: K):
       let v := ListArray.get a idx in
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
         R (a_ptr: address) a_var idx_var var,
 
-        sep (sizedlistarray_value a_ptr len a) R mem ->
+        sep (repr a_ptr len a) R mem ->
         map.get locals a_var = Some a_ptr ->
         map.get locals idx_var = Some (word.of_Z (Z.of_nat (cast idx))) ->
 
-        Z.of_nat (cast idx) < Z.of_nat len ->
+        (cast idx < len)%nat ->
 
         (let v := v in
          <{ Trace := tr;
             Memory := mem;
-            Locals := map.put locals var (ai.(ai_to_word) v);
+            Locals := map.put locals var (Elem.to_word v);
             Functions := functions }>
          k_impl
          <{ pred (k v eq_refl) }>) ->
@@ -693,39 +757,35 @@ Section with_parameters.
           (cmd.set
              var
              (expr.load
-                (ai.(ai_size))
+                (Elem.size)
                 (offset (expr.var a_var)
                         (expr.var idx_var)
-                        (expr.literal ai.(ai_width)))))
+                        (expr.literal Elem.width))))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       intros.
-      eapply (compile_array_get sz id (fun x => K_to_nat idx) _ (fun (addr: word) a => repr addr len a));
-        eauto using ListArray_Hget.
-      - eapply SizedListArray_Hrw, SizedListArray_length.
-        eassumption.
-      - unfold id.
-        erewrite SizedListArray_length by eassumption.
-        assumption.
+      simple eapply (compile_array_get (AI := info))
+        with (a := a) (idx := idx); simpl;
+        try erewrite SizedListArray_length; eauto.
     Qed.
 
-    Lemma compile_sizedlistarray_put {len} {tr mem locals functions}
-          (a: ListArray.t ai.(ai_type)) (idx: K) val:
+    Lemma compile_put {len} {tr mem locals functions}
+          (a: ListArray.t Elem.type) (idx: K) val:
       let v := ListArray.put a idx val in
       forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
         R (a_ptr: address) a_var idx_var val_var var,
 
-        sep (sizedlistarray_value a_ptr len a) R mem ->
+        sep (repr a_ptr len a) R mem ->
         map.get locals a_var = Some a_ptr ->
         map.get locals idx_var = Some (word.of_Z (Z.of_nat (cast idx))) ->
-        map.get locals val_var = Some (ai.(ai_to_word) val) ->
+        map.get locals val_var = Some (Elem.to_word val) ->
 
-        Z.of_nat (cast idx) < Z.of_nat len ->
+        (cast idx < len)%nat ->
 
         (let v := v in
          forall mem',
-           sep (sizedlistarray_value a_ptr len v) R mem' ->
+           sep (repr a_ptr len v) R mem' ->
            <{ Trace := tr;
               Memory := mem';
               Locals := locals;
@@ -738,80 +798,97 @@ Section with_parameters.
            Functions := functions }>
         cmd.seq
           (cmd.store
-             (ai.(ai_size))
+             (Elem.size)
              (offset (expr.var a_var)
                      (expr.var idx_var)
-                     (expr.literal ai.(ai_width)))
+                     (expr.literal Elem.width))
              (expr.var val_var))
           k_impl
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       intros.
-      eapply (compile_array_put sz id (fun x => K_to_nat x) _ _ (fun (addr: word) a => repr addr len a));
-        eauto using ListArray_Hget, ListArray_Hput,
-        ListArray_Hgetput.
-      - eapply SizedListArray_Hrw, SizedListArray_length.
-        eassumption.
-      - eapply SizedListArray_Hrw.
-        unfold id; rewrite ListArray.put_length.
-        eapply SizedListArray_length.
-        eassumption.
-      - unfold id.
-        erewrite SizedListArray_length by eassumption.
-        lia.
+      simple eapply (compile_array_put (AI := info))
+        with (a := a) (val := val) (idx := idx);
+        simpl; erewrite ?ListArray.put_length;
+          erewrite ?SizedListArray_length; eauto.
     Qed.
-  End GenericSizedListArray.
+  End with_parameters.
+End GenericSizedListArray.
 
-  Ltac prepare_array_lemma lemma sz := (* This makes [simple apply] work *)
-    pose (lemma sz) as lem;
-    cbv beta iota delta [_access_info ai_type ai_repr ai_to_word ai_width ai_size] in (type of lem);
-    change (let ai_width := _ in ?x) with x in (type of lem);
-    cbv beta in (type of lem);
-    let t := type of lem in
-    exact (lem: t).
+Ltac prepare_array_lemma lemma sz := (* This makes [simple apply] work *)
+  pose (fun {semantics : Semantics.parameters}
+          {semantics_ok : Semantics.parameters_ok semantics} =>
+          lemma semantics semantics_ok sz) as lem;
+  cbv beta iota delta [_elem_info] in *;
+  GenericArray._cbv lem; Elem._cbv lem;
+  let t := type of lem in
+  exact (lem: t).
 
-  Notation prepare_array_lemma lemma sz :=
-    ltac:(prepare_array_lemma lemma sz) (only parsing).
+Notation prepare_array_lemma lemma sz :=
+  ltac:(prepare_array_lemma lemma sz) (only parsing).
 
-  Definition compile_byte_vectorarray_get :=
-    prepare_array_lemma (@compile_vectorarray_get) AccessByte.
-  Definition compile_word_vectorarray_get :=
-    prepare_array_lemma (@compile_vectorarray_get) AccessWord.
-  Definition compile_byte_vectorarray_put :=
-    prepare_array_lemma (@compile_vectorarray_put) AccessByte.
-  Definition compile_word_vectorarray_put :=
-    prepare_array_lemma (@compile_vectorarray_put) AccessWord.
+Module ByteVectorArray.
+  Notation repr := (GenericVectorArray.repr (sz := AccessByte)).
+  Definition compile_get :=
+    prepare_array_lemma (@GenericVectorArray.compile_get) AccessByte.
+  Definition compile_put :=
+    prepare_array_lemma (@GenericVectorArray.compile_put) AccessByte.
+End ByteVectorArray.
+Arguments ByteVectorArray.compile_get {_ _}.
+Arguments ByteVectorArray.compile_put {_ _}.
 
-  Definition compile_byte_unsizedlistarray_get :=
-    prepare_array_lemma (@compile_unsizedlistarray_get) AccessByte.
-  Definition compile_word_unsizedlistarray_get :=
-    prepare_array_lemma (@compile_unsizedlistarray_get) AccessWord.
-  Definition compile_byte_unsizedlistarray_put :=
-    prepare_array_lemma (@compile_unsizedlistarray_put) AccessByte.
-  Definition compile_word_unsizedlistarray_put :=
-    prepare_array_lemma (@compile_unsizedlistarray_put) AccessWord.
+Module WordVectorArray.
+  Notation repr := (GenericVectorArray.repr (sz := AccessWord)).
+  Definition compile_get :=
+    prepare_array_lemma (@GenericVectorArray.compile_get) AccessWord.
+  Definition compile_put :=
+    prepare_array_lemma (@GenericVectorArray.compile_put) AccessWord.
+End WordVectorArray.
+Arguments WordVectorArray.compile_get {_ _}.
+Arguments WordVectorArray.compile_put {_ _}.
 
-  Definition compile_byte_sizedlistarray_get :=
-    prepare_array_lemma (@compile_sizedlistarray_get) AccessByte.
-  Definition compile_word_sizedlistarray_get :=
-    prepare_array_lemma (@compile_sizedlistarray_get) AccessWord.
-  Definition compile_byte_sizedlistarray_put :=
-    prepare_array_lemma (@compile_sizedlistarray_put) AccessByte.
-  Definition compile_word_sizedlistarray_put :=
-    prepare_array_lemma (@compile_sizedlistarray_put) AccessWord.
-End with_parameters.
+Module ByteListArray.
+  Notation repr := (GenericListArray.repr (sz := AccessByte)).
+  Definition compile_get :=
+    prepare_array_lemma (@GenericListArray.compile_get) AccessByte.
+  Definition compile_put :=
+    prepare_array_lemma (@GenericListArray.compile_put) AccessByte.
+End ByteListArray.
+Arguments ByteListArray.compile_get {_ _}.
+Arguments ByteListArray.compile_put {_ _}.
 
-Arguments Arrays._access_info /.
-Arguments Arrays.ai_width /.
+Module WordListArray.
+  Notation repr := (GenericListArray.repr (sz := AccessWord)).
+  Definition compile_get :=
+    prepare_array_lemma (@GenericListArray.compile_get) AccessWord.
+  Definition compile_put :=
+    prepare_array_lemma (@GenericListArray.compile_put) AccessWord.
+End WordListArray.
+Arguments WordListArray.compile_get {_ _}.
+Arguments WordListArray.compile_put {_ _}.
 
-Ltac cbn_array :=
-  cbn [Arrays._access_info
-         ai_type ai_size ai_repr ai_to_word ai_width
-         Memory.bytes_per] in *;
-  change (Z.of_nat 1%nat) with (1%Z) in *;
-  change (Z.of_nat 2%nat) with (2%Z) in *;
-  change (Z.of_nat 4%nat) with (4%Z) in *;
-  change (Z.of_nat 8%nat) with (8%Z) in *.
+Module ByteSizedListArray.
+  Notation repr := (GenericSizedListArray.repr (sz := AccessByte)).
+  Definition compile_get :=
+    prepare_array_lemma (@GenericSizedListArray.compile_get) AccessByte.
+  Definition compile_put :=
+    prepare_array_lemma (@GenericSizedListArray.compile_put) AccessByte.
+End ByteSizedListArray.
+Arguments ByteSizedListArray.compile_get {_ _}.
+Arguments ByteSizedListArray.compile_put {_ _}.
+
+Module WordSizedListArray.
+  Notation repr := (GenericSizedListArray.repr (sz := AccessWord)).
+  Definition compile_get :=
+    prepare_array_lemma (@GenericSizedListArray.compile_get) AccessWord.
+  Definition compile_put :=
+    prepare_array_lemma (@GenericSizedListArray.compile_put) AccessWord.
+End WordSizedListArray.
+Arguments WordSizedListArray.compile_get {_ _}.
+Arguments WordSizedListArray.compile_put {_ _}.
+
+Arguments _elem_info /.
+Arguments Elem.width /.
 
 Instance Convertible_Z_nat : Convertible Z nat :=
   fun w => Z.to_nat w.
@@ -823,25 +900,25 @@ Hint Unfold cast : compiler_cleanup.
 Hint Unfold Convertible_word_nat : compiler_cleanup.
 
 Module VectorArrayCompiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_byte_vectorarray_get); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_word_vectorarray_get); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_byte_vectorarray_put); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_word_vectorarray_put); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@ByteVectorArray.compile_get); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@WordVectorArray.compile_get); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@ByteVectorArray.compile_put); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@WordVectorArray.compile_put); shelve : compiler.
 End VectorArrayCompiler.
 
-Module UnsizedListArrayCompiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_byte_unsizedlistarray_get); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_word_unsizedlistarray_get); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_byte_unsizedlistarray_put); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_word_unsizedlistarray_put); shelve : compiler.
-End UnsizedListArrayCompiler.
+Module ListArrayCompiler.
+  #[export] Hint Extern 1 => simple eapply (@ByteListArray.compile_get); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@WordListArray.compile_get); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@ByteListArray.compile_put); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@WordListArray.compile_put); shelve : compiler.
+End ListArrayCompiler.
 
 Module SizedListArrayCompiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_byte_sizedlistarray_get); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_word_sizedlistarray_get); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_byte_sizedlistarray_put); shelve : compiler.
-  #[export] Hint Extern 1 => simple eapply (@compile_word_sizedlistarray_put); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@ByteSizedListArray.compile_get); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@WordSizedListArray.compile_get); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@ByteSizedListArray.compile_put); shelve : compiler.
+  #[export] Hint Extern 1 => simple eapply (@WordSizedListArray.compile_put); shelve : compiler.
 End SizedListArrayCompiler.
 
 Export VectorArrayCompiler.
-(* UnsizedListArrayCompiler and SizedListArrayCompiler conflict, so don't export them. *)
+(* ListArrayCompiler and SizedListArrayCompiler conflict, so don't export them. *)

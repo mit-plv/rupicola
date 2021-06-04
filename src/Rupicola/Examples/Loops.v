@@ -104,7 +104,7 @@ Section Ex.
     compile_setup.
     repeat compile_step.
 
-    erewrite map_as_mutating_ranged_for with (Vxs := "a1") (Vfrom := "from") (Vto := "to");
+    erewrite map_as_mutating_ranged_for with (Vxs := "a1") (Vfrom := "from") (Vto := "to").
       repeat compile_step.
 
     replace (word.of_Z (Z.of_nat (Datatypes.length a1))) with len;
@@ -118,6 +118,7 @@ Section Ex.
 
     all: repeat compile_step; try lia; compile_done.
   Qed.
+
 
   Program Definition vect_memcpy {n1 n2} (len: word)
           (a1: VectorArray.t word n1)

@@ -539,10 +539,8 @@ Section __.
         (rewrite map.get_put_same; auto;easy)
         ||  rewrite map.get_put_diff); easy.
 
-      
-  Hint Extern 1 => simple eapply @compile_byte_unsizedlistarray_get; shelve : compiler.
+  Hint Extern 1 => simple eapply @ByteListArray.compile_get; shelve : compiler.
 
-  
   Lemma Nsucc_double_preserves_leq n p
     : Z.of_N n <= Z.pos p -> Z.of_N (Pos.Nsucc_double n) <= Z.pos p~1.
   Proof.
@@ -583,19 +581,17 @@ Section __.
     apply Z_and_leq_right.
     all: apply word.unsigned_range.
   Qed.
-    
-  
+
   Instance spec_of_crc32 : spec_of "crc32" :=
     fnspec! "crc32" data_ptr len / (data : list byte) R ~> r,
     { requires fns tr mem :=
         (word.unsigned len = Z.of_nat (length data) /\
-        (listarray_value AccessByte data_ptr data * R)%sep mem);
+        (ByteListArray.repr data_ptr data * R)%sep mem);
       ensures tr' mem' :=
         tr' = tr /\
         r = crc32' data /\
-        (listarray_value AccessByte  data_ptr data * R)%sep mem' }.
+        (ByteListArray.repr data_ptr data * R)%sep mem' }.
 
-  
   Derive crc32_body SuchThat
          (defn! "crc32" ("data", "len") ~> "crc32" { crc32_body },
           implements crc32')
@@ -609,7 +605,7 @@ Section __.
       with (signed := false)
            (loop_pred := (fun idx acc tr' mem' locals' =>
                             (*TODO: existential is bad; need partial computation?*)
-          (listarray_value AccessByte data_ptr data * R)%sep mem'
+          (ByteListArray.repr data_ptr data * R)%sep mem'
           /\ tr' = tr
           /\ locals' = map.put
                          (map.put 
@@ -627,6 +623,10 @@ Section __.
     }
     {
       repeat compile_step.
+      eapply compile_nlet_as_nlet_eq.
+      simple eapply ByteListArray.compile_get.
+      Hint Extern 1 => simple eapply ByteListArray.compile_get; shelve : compiler.
+      compile_step.
       {
         rewrite <-H0 in Hr.
         rewrite word.of_Z_unsigned in Hr.
