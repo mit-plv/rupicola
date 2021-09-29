@@ -93,3 +93,5 @@
      Specifically, make sure that the only thing the invariant does with the counter is to store it in the right place int he map; hence ~invariant index locals -> invariant index' (map.put locals "index" index')~.
      This seems restrictive, but in fact it has to be true even for solution 5 to work, otherwise the increment wouldn't set the index to the right value.
   In the current implementation solution (1.) is used to phrase and prove a single loop lemma, and then specialized variants in the shape of solution (6.) are derived from it.
+* Dealing with non-linearity
+  Multiple conditions on input, but what about output?

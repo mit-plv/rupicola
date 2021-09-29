@@ -44,6 +44,7 @@ Module FNV1A (Import P: FNV1A_params).
          As update_body_correct.
   Proof.
     compile.
+    compile_step.
   Qed.
 
   Definition fnv1a (data: ListArray.t byte) len :=
@@ -121,6 +122,12 @@ Module Murmur3.
     let/n k := word.mul k (word.of_Z 513432918353) in
     let/n k := word.or (word.slu k (word.of_Z 15)) (word.sru k (word.of_Z 17)) in
     let/n k := word.mul k (word.of_Z 461845907) in
+    let/n k := word.mul k (word.of_Z 513432918353) in
+    let/n k := word.or (word.slu k (word.of_Z 15)) (word.sru k (word.of_Z 17)) in
+    let/n k := word.mul k (word.of_Z 461845907) in
+    let/n k := word.mul k (word.of_Z 513432918353) in
+    let/n k := word.or (word.slu k (word.of_Z 15)) (word.sru k (word.of_Z 17)) in
+    let/n k := word.mul k (word.of_Z 461845907) in
     k.
 
   Implicit Type R : mem -> Prop.
@@ -129,12 +136,62 @@ Module Murmur3.
     { requires fns tr mem := True;
       ensures tr' mem' := tr = tr' /\ mem = mem' /\ k' = scramble k }.
 
+  Set Ltac Profiling.
+
   Derive scramble_body SuchThat
          (defn! "scramble"("k") ~> "k" { scramble_body },
           implements scramble)
          As scramble_body_correct.
   Proof.
+    Time compile.
+    compile_setup.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+
+    2: compile_step.
+    (* 2: compile_step. *)
+
+    Print HintDb compiler_cleanup.
+
+    Create HintDb cc discriminated.
+    Hint Extern 1 => match goal with |- context[cast] => unfold cast end : cc.
+    Hint Extern 1 => match goal with |- context[Convertible_word_nat] => unfold Convertible_word_nat end : cc.
+    Hint Extern 1 => match goal with |- context[postcondition_cmd] => unfold postcondition_cmd end : cc.
+    Hint Extern 1 => match goal with |- context[wp_bind_retvars] => unfold wp_bind_retvars end : cc.
+
+    Time eauto 10 with cc.
+    compile_solve_side_conditions.
+
+
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
+    compile_step.
     Time compile.                  (* 1.9s, 1.16 on compressed example; 2.02 s previously; but 4s to fail on compressed example *)
+
+    Show Ltac Profile.
   Time Qed.                          (* 2.3, 0.35 on compressed example; instantaneous previously *)
 End Murmur3.
 

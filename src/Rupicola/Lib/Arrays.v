@@ -821,8 +821,8 @@ Ltac cbn_array :=
 Instance Convertible_word_nat {width : Z} {word : word width} : Convertible word nat :=
   fun w => Z.to_nat (word.unsigned w).
 
-Hint Unfold cast : compiler_cleanup.
-Hint Unfold Convertible_word_nat : compiler_cleanup.
+Hint Extern 1 => match goal with |- context[cast] => unfold cast end : compiler_cleanup.
+Hint Extern 1 => match goal with |- context[Convertible_word_nat] => unfold Convertible_word_nat end : compiler_cleanup.
 
 Module VectorArrayCompiler.
   #[export] Hint Extern 1 => simple eapply (@compile_byte_vectorarray_get); shelve : compiler.

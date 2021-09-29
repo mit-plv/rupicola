@@ -884,8 +884,8 @@ Module ExprReflection.
     let bindings := map_to_list locals in
     let reified := expr_reify_word W bindings w in
     simple apply compile_expr_w with (e := compile reified);
-    [ set_change locals with (map.of_list bindings);
-      change w with (er_T2w (expr_reifier := expr_word_reifier)
+    [ set_change locals with (map.of_list bindings); (* FIXME: Avoid unification by using a context match *)
+      change w with (er_T2w (expr_reifier := expr_word_reifier) (* FIXME: Avoid unification by using a context match *)
                             (interp (map.of_list (map := SortedListString.map _) bindings) reified))
     | ].
 
@@ -907,14 +907,16 @@ Module ExprReflection.
     let z_bindings := type_term z_bindings in
     let reified := ExprReflection.expr_reify_Z z_bindings z in
     simple apply compile_expr_Z with (e := ExprReflection.compile reified);
-    [ set_change locals with (map.of_list bindings);
+    [ set_change locals with (map.of_list bindings); (* FIXME: Avoid unification by using a context match *)
       change (word.of_Z z)
-        with (ExprReflection.er_T2w
+        with (ExprReflection.er_T2w (* FIXME: Avoid unification by using a context match *)
                 (expr_reifier := expr_Z_reifier)
                 (ExprReflection.interp (er := expr_Z_reifier)
                                        (map.of_list (map := SortedListString.map _) z_bindings)
                                        reified))
     | ].
+
+  (* Instead of change, use replace or assert and then prove result with cbv […] + eq_refl (or maybe exact_no_check + eq_refl). *)
 
   Ltac compile_prove_expr_reification_premise :=
     eapply interp_sound;
@@ -1266,8 +1268,8 @@ Ltac solve_map_eq :=
   reflexivity.
 
 Create HintDb compiler_cleanup discriminated.
-Hint Unfold wp_bind_retvars : compiler_cleanup.
-Hint Unfold postcondition_cmd : compiler_cleanup.
+Hint Extern 1 => match goal with |- context[postcondition_cmd] => unfold postcondition_cmd end : compiler_cleanup.
+Hint Extern 1 => match goal with |- context[wp_bind_retvars] => unfold wp_bind_retvars end : compiler_cleanup.
 Hint Rewrite @word.of_nat_to_nat_unsigned : compiler_cleanup.
 Hint Rewrite @word.of_Z_of_nat_to_nat_unsigned : compiler_cleanup.
 
