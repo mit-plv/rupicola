@@ -404,6 +404,8 @@ Notation "name sig  {  body  } ,  'implements'  fn  'using'  fns" :=
         fns constr at level 0,
         no associativity).
 
+Definition __rupicola_program_marker {A} (a: A) := True.
+
 Notation "defn! spec" :=
   (match spec with
    | spec_constr =>
