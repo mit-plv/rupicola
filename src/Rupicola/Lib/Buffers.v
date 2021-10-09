@@ -32,9 +32,6 @@ Section with_parameters.
   (*     (listarray_value AccessWord ptr data ⋆ *)
   (*      listarray_value AccessWord (endof ptr data) padding) mem. *)
 
-  Notation wlen data :=
-    (word.of_Z (Z.of_nat (length data))).
-
   (* Keeping `capacity` constant makes loop inference easier than storing the
      amount of free space left. *)
   Definition buffer_value (ptr: word) (data: buffer_t) (capacity: nat) mem :=
@@ -63,6 +60,19 @@ Section with_parameters.
 
   Definition app (buf: buffer_t) (arr: list word) :=
     buf ++ arr.
+
+  Lemma push_length b w:
+    length (push b w) = (length b + 1)%nat.
+  Proof. unfold push; rewrite app_length; reflexivity. Qed.
+
+  Lemma push_length_Z b w:
+    Z.of_nat (length (push b w)) = (Z.of_nat (length b) + 1).
+  Proof. rewrite push_length, Nat2Z.inj_add; reflexivity. Qed.
+
+  Lemma push_wlen b w:
+    wlen (push b w) =
+    word.of_Z (width := width) (Z.of_nat (length b) + 1).
+  Proof. rewrite push_length_Z; reflexivity. Qed.
 
   Set Printing Compact Contexts.
 
@@ -114,7 +124,8 @@ Section with_parameters.
       all: cbn_array; reflexivity || lia || idtac. }
   Qed.
 
-  Compute List.fold_left (fun l x => l ++ [x]) [35; 36] [1;2;3].
+
+
 
   Lemma app_as_foldl_push b1 b2 :
     app b1 b2 = List.fold_left push b2 b1.
@@ -137,15 +148,58 @@ Section with_parameters.
     unfold cast, Convertible_self, id; lia.
   Qed.
 
-  Definition rupicola_app (b1 b2: buffer_t) :=
-    let/n b1 := ranged_for 0 (Z.of_nat (length b2))
-                          (fun (b1: buffer_t) tok idx2 _ =>
-                             let/n idx1 := Z.of_nat (length b1) + idx2 in
-                             let/n w := ListArray.get b2 (Z.to_nat idx2) in
-                             let/n b1 := push b1 w in
-                             (tok, b1))
-                          b1 in
-    b1.
+
+
+
+  (* Definition rupicola_app_step buf0 (arr: list word) := *)
+  (*   (fun (p: \<< buffer_t, Z \>>) (tok: ExitToken.t) idx2 *)
+  (*      (pr: -1 < idx2 < Z.of_nat (length arr)) => *)
+  (*      let '\< buf, buf_len \> := p in *)
+  (*      let/n idx1 := Z.of_nat (length buf0) + idx2 in (* needed? *) *)
+  (*      let/n w := ListArray.get arr (Z.to_nat idx2) in *)
+  (*      let/n buf' as "buf" := push buf w in *)
+  (*      let/n buf_len := buf_len + 1 in *)
+  (*      (tok, \<buf, buf_len\>)). *)
+
+  Definition rupicola_app_step (buf0: buffer_t) (arr: list word) :=
+    (fun (buf: buffer_t) (tok: ExitToken.t) idx2
+       (pr: -1 < idx2 < Z.of_nat (length arr)) =>
+       let/n idx1 := Z.of_nat (length buf0) + idx2 in
+       let/n w := ListArray.get arr (Z.to_nat idx2) in
+       let/n buf := push buf w in
+       (tok, buf)).
+
+  Lemma rupicola_app_eqn :
+    forall buf0 arr from',
+      0 <= from' < Z.of_nat (length arr) ->
+      ranged_for' 0 from'
+                  (fun (buf: buffer_t) (tok: ExitToken.t) idx2
+                     (pr: -1 < idx2 < _) =>
+                     let/n idx1 := Z.of_nat (length buf0) + idx2 in
+                     let/n w := ListArray.get arr (Z.to_nat idx2) in
+                     let/n buf := push buf w in
+                     (tok, buf))  buf0 =
+      (ExitToken.new, buf0 ++ List.firstn (Z.to_nat from') arr).
+
+
+
+      ranged_for' 0 (length)
+
+  (* FIXME the problem here is that we want to update buf_len every time, so maybe we need an assignment to it on the outside; but on the other hand we want to maintain it as (length buf), so not as its own independent thing, so we don't want to export its mutation outside the loop.
+
+   If we do the first way we need a theorem that rewrites the result of the iteration as a length; this should be easier once there's a lemma for fold whose intermediate state is a fold.
+
+   If we do the second way then we need to change the loop inference so that it generalizes `buf` also in the locals.
+
+   With the first solution
+
+   Maybe the right way to do this is to not increment buf_len every time at all; instead compute the original buf_len + idx2 *)
+
+  Definition rupicola_app (buf: buffer_t) (arr: list word) :=
+    let/n buf :=
+       ranged_for 0 (Z.of_nat (length arr))
+                  (rupicola_app_step buf arr) buf in
+    buf.
 
   Lemma app_as_rupicola_app (b1 b2: buffer_t) :
     app b1 b2 = rupicola_app b1 b2.
@@ -153,7 +207,7 @@ Section with_parameters.
     rewrite app_as_foldl_push.
     erewrite copying_foldl_as_ranged_for
       with (f' := fun b2 idx2 _ => ListArray.get b2 (Z.to_nat idx2)).
-    - rewrite ranged_for_all_as_ranged_for; reflexivity.
+    - rewrite ranged_for_all_as_ranged_for. reflexivity.
     - eauto using ListArray_nth_error_get_Z.
   Qed.
 
@@ -163,14 +217,34 @@ Section with_parameters.
           (R: Mem -> Prop),
     { requires tr mem :=
         buf_len = wlen buf /\ arr_len = wlen arr /\
+        Z.of_nat (length arr) < 2 ^ width /\
         (length buf + length arr <= capacity)%nat /\
-        (buffer_value buf_ptr buf capacity ⋆ R) mem;
+        (buffer_value buf_ptr buf capacity ⋆
+         listarray_value AccessWord arr_ptr arr ⋆ R) mem;
       ensures tr' mem' :=
         tr' = tr /\
-        (buffer_value buf_ptr (app buf arr) capacity ⋆ R) mem' }.
+        (buffer_value buf_ptr (app buf arr) capacity ⋆
+         listarray_value AccessWord arr_ptr arr ⋆ R) mem' }.
 
-  (* Hint Extern 1 => rewrite app_as_rupicola_app; shelve : compiler_setup. *)
+  Lemma word_pow2_width_pos :
+    0 < 2 ^ width.
+  Proof. apply Z.pow_pos_nonneg, word.width_nonneg; lia. Qed.
 
+  Hint Extern 1 => rewrite app_as_rupicola_app; shelve : compiler_setup.
+  Hint Extern 1 (_ <= _) => lia : compiler_side_conditions.
+  Hint Resolve word_pow2_width_pos : compiler_side_conditions.
+
+  Hint Unfold cast Convertible_self id : compiler_cleanup.
+  Hint Rewrite Z2Nat.id using lia : compiler_cleanup.
+
+  Hint Resolve Z.pow_pos_nonneg word.width_nonneg : compiler_side_conditions.
+  Hint Extern 1 => progress cbn [fst snd]; shelve : compiler_side_conditions.
+  Hint Rewrite push_wlen : compiler_cleanup.
+  Hint Unfold rupicola_app_step : compiler_cleanup.
+
+  Hint Extern 1 => simple eapply compile_buffer_push; shelve : compiler.
+
+  Import UnsizedListArrayCompiler.
 
   Derive buf_append_body SuchThat
          (defn! "buf_append"("buf_ptr", "buf_len", "arr_ptr", "arr_len")
@@ -178,39 +252,60 @@ Section with_parameters.
           implements rupicola_app)
          As buf_append_correct.
   Proof.
-    Hint Extern 1 => rewrite app_as_rupicola_app; shelve : compiler_setup.
     compile_setup.
-    compile_step.
-    compile_step.
+    repeat compile_step.
 
+    (* FIXME: invariant *should* generalize the objects (since otherwise wlen below isn't generalized) *)
     apply compile_nlet_as_nlet_eq.
+
+    (* eapply compile_ranged_for_fresh with *)
+    (*     (signed := false) *)
+    (*     (from_var := "idx2") (to_var := "len2") *)
+    (*     (from_expr := expr.literal 0) *)
+    (*     (loop_pred := fun from buf tr' mem' locals' => *)
+    (*                    tr' = tr /\ *)
+    (*                    locals' = #{ *)
+    (*            "buf_ptr" => buf_ptr; "buf_len" => wlen buf; "arr_ptr" => *)
+    (*            arr_ptr; "arr_len" => wlen arr; *)
+    (*                                 "idx2" => word.of_Z from; *)
+    (*                                          "len2" => wlen arr *)
+    (*                                }# /\ *)
+    (*                    (buffer_value buf_ptr buf capacity ⋆ *)
+    (*                     listarray_value AccessWord arr_ptr arr ⋆ R) mem'). *)
+
     eapply compile_ranged_for_fresh with
         (signed := false)
         (from_var := "idx2") (to_var := "len2")
         (from_expr := expr.literal 0)
-        (loop_pred := fun from buf tr' mem' locals' =>
+        (loop_pred := fun from buf' tr' mem' locals' =>
                        tr' = tr /\
                        locals' = #{
-               "buf_ptr" => buf_ptr; "buf_len" => buf_len; "arr_ptr" =>
+               "buf_ptr" => buf_ptr; "buf_len" => wlen buf; "arr_ptr" =>
                arr_ptr; "arr_len" => wlen arr;
                                     "idx2" => word.of_Z from;
                                              "len2" => wlen arr
                                    }# /\
-                       (buffer_value buf_ptr buf capacity ⋆ R) mem').
+                       (buffer_value buf_ptr buf' capacity ⋆
+                        listarray_value AccessWord arr_ptr arr ⋆ R) mem').
+
 
     all: repeat compile_step.
-    all: try lia.
-    eapply sizedlistarray_value_app1_length
-      (buffer_value buf_ptr buf capacity ⋆ R) mem in
 
-    repeat compile_step.
-    repeat compile_step.
-    repeat compile_step.
-    repeat compile_step.
-    compile_step.
-    compile_step.
-    compile_step.
-    compile.
+    2: {                        (* FIXME proof general screws up error positions here *)
+      replace (wlen acc) with (word.add (word := word) (wlen buf) (word.of_Z from')).
+      repeat compile_step.
+      admit.
+    }
+
+    subst acc a.
+    set (ranged_for' _ _ _ _).
+    pose (rupicola_app_step buf (List.firstn (Z.to_nat from') arr)) as f.
+    rewrite firstn_length_le, Z2Nat.id in (type of f) by lia.
+    replace (snd p) with (app buf (List.firstn (Z.to_nat from') arr)).
+    rewrite app_length, firstn_length_le by lia.
+    lia.
+
+    admit.
   Qed.
 
 
@@ -291,3 +386,6 @@ Section with_parameters.
         eauto using sizedlistarray_as_buffer.
       all: cbn_array; reflexivity || lia || idtac. }
   Qed.
+End Section.
+
+#[export] Hint Extern 1 => simple eapply compile_buffer_push; shelve : compiler.

@@ -641,7 +641,7 @@ Ltac compile_solve_side_conditions :=
     first [ compile_use_default_value
           | compile_autocleanup with compiler_side_conditions
           | step_with_db compiler_side_conditions
-          | solve [ typeclasses eauto | eauto with compiler_cleanup ] ]
+          | solve [ typeclasses eauto | eauto with nocore compiler_cleanup ] ]
   end.
 
 Ltac compile_triple :=

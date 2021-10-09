@@ -682,6 +682,16 @@ Section with_parameters.
       - rewrite word.unsigned_of_Z_nowrap; lia.
     Qed.
 
+    Lemma sizedlistarray_value_max_length_weak {len addr a R mem} :
+      (sizedlistarray_value len addr a ⋆ R) mem ->
+      Z.of_nat len <= 2 ^ width.
+    Proof.
+      intros H%sizedlistarray_value_max_length.
+      pose proof ai_width_bounded ai.
+      etransitivity; eauto.
+      rewrite <- Z.mul_1_l at 1; apply Z.mul_le_mono_nonneg; lia.
+    Qed.
+
     Lemma sizedlistarray_value_app1_length {len addr a1 a2 R mem} :
       (sizedlistarray_value len addr (a1 ++ a2) ⋆ R) mem ->
       (length a1 = len - length a2)%nat.

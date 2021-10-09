@@ -1148,6 +1148,27 @@ Section Array.
   Proof.
     intros; eapply Znot_gt_le, array_max_length'; eauto using word.unsigned_range.
   Qed.
+
+  Lemma array_max_length_div: forall addr xs (R: Mem -> Prop) m,
+      no_aliasing element ->
+      0 < word.unsigned size ->
+      (array element size addr xs * R)%sep m ->
+      Z.of_nat (length xs) <= 2 ^ width / word.unsigned size.
+  Proof.
+    intros; apply Z.div_le_lower_bound; try lia.
+    eauto using array_max_length.
+  Qed.
+
+  Lemma array_max_length_weak: forall addr xs (R: Mem -> Prop) m,
+      no_aliasing element ->
+      0 < word.unsigned size ->
+      (array element size addr xs * R)%sep m ->
+      Z.of_nat (length xs) <= 2 ^ width.
+  Proof.
+    intros; transitivity (word.unsigned size * Z.of_nat (length xs));
+      eauto using array_max_length.
+    rewrite <- Z.mul_1_l at 1; apply Z.mul_le_mono_nonneg; lia.
+  Qed.
 End Array.
 
 Section Aliasing.
