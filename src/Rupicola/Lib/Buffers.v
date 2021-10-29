@@ -19,12 +19,8 @@ Section with_parameters.
 
   Definition buffer_t := list word.
 
-  (* Definition wlen (data: list word) : word := *)
-  (*   word.of_Z (Z.of_nat (length data * 4)). *)
-
-  (* Definition endof (ptr: word) (data: list word) : word := *)
-  (*   word.add ptr (wlen data). *)
-
+  Notation wlen data :=
+    (word.of_Z (Z.of_nat (length data))).
 
   (* Definition _buffer_value (ptr: word) (data: buffer_t) (capacity: nat) mem := *)
   (*   exists padding: list word, *)
@@ -180,11 +176,7 @@ Section with_parameters.
                      let/n buf := push buf w in
                      (tok, buf))  buf0 =
       (ExitToken.new, buf0 ++ List.firstn (Z.to_nat from') arr).
-
-
-
-      ranged_for' 0 (length)
-
+  Abort.
   (* FIXME the problem here is that we want to update buf_len every time, so maybe we need an assignment to it on the outside; but on the other hand we want to maintain it as (length buf), so not as its own independent thing, so we don't want to export its mutation outside the loop.
 
    If we do the first way we need a theorem that rewrites the result of the iteration as a length; this should be easier once there's a lemma for fold whose intermediate state is a fold.
@@ -245,6 +237,8 @@ Section with_parameters.
   Hint Extern 1 => simple eapply compile_buffer_push; shelve : compiler.
 
   Import UnsizedListArrayCompiler.
+
+  Require Import AdmitAxiom.
 
   Derive buf_append_body SuchThat
          (defn! "buf_append"("buf_ptr", "buf_len", "arr_ptr", "arr_len")
@@ -324,7 +318,7 @@ Section with_parameters.
     (forall {tr mem locals functions} buf arr capacity,
         let v := app buf arr in
         let locals1 := map.put locals idx_var (word.of_Z 0) in
-        let locals2 := map.put locals1 len_var (wlen arr)) in
+        let locals2 := map.put locals1 len_var (wlen arr) in
     forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl : cmd}
       R buf_ptr arr_ptr,
 
