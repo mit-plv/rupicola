@@ -67,9 +67,9 @@ Section examples.
        ([m; k1; k2; k3; v], [ret],
         bedrock_func_body:(
           unpack! err, v1 = get (m, k1) ;
-            require !err ;
+            match !err ;
             unpack! err, v2 = get (m, k2) ;
-            require !err ;
+            match !err ;
             add (v1, v2, v);
             unpack! ret = put (m, k3, v)
       ))).
@@ -204,9 +204,9 @@ Section examples.
        ([m; k1; k2], [],
         bedrock_func_body:(
           unpack! err, v1 = get (m, k1) ;
-            require !err ;
+            match !err ;
             unpack! err, v2 = get (m, k2) ;
-            require !err ;
+            match !err ;
             unpack! err = put (m, k2, v1)
             (* now v2 is stored in v1 -- no need for second put *)
       ))).

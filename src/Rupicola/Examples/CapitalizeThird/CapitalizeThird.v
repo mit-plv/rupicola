@@ -26,12 +26,12 @@ Module Bedrock2.
        len = (load( s_ptr )) ;
        i = (coq:(0)) ;
        c_ptr = (s_ptr + wordsize) ;
-       while (i < len) {{
+       for (i < len) {
          unpack! x = toupper (load1( c_ptr )) ;
          store1(c_ptr, x) ;
          c_ptr = (c_ptr + charsize) ;
          i = (i + coq:(1))
-       }} ;
+       } ;
        ret = (coq:(1))))).
 
   Definition capitalize_3rd : func :=
