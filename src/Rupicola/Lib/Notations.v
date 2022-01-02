@@ -167,22 +167,29 @@ Notation "'let/!' x := val 'in' body" :=
 Infix "~>" := scalar (at level 40, only parsing).
 
 Declare Custom Entry maps.
+Declare Custom Entry map_key.
+Declare Custom Entry map_value.
 
-Notation "x => y" :=
-  (map.put map.empty x y)
+Notation "k" := k (in custom map_key at level 0, k constr at level 0).
+Notation "v" := v (in custom map_value at level 0, v constr at level 80).
+
+Notation "k => v" :=
+  (map.put map.empty k v)
     (in custom maps at level 80,
-        x constr at level 0, y constr at level 80,
+        k custom map_key at level 0,
+        v custom map_value at level 0,
         no associativity,
-        format "x  =>  y").
+        format "'[' k  =>  v ']'").
 
-Notation "z ; x => y" :=
-  (map.put z x y)
+Notation "z ; k => v" :=
+  (map.put z k v)
     (in custom maps at level 82,
-        x constr at level 0, y constr at level 80,
+        k custom map_key at level 0,
+        v custom map_value at level 0,
         z custom maps, left associativity,
-        format "z ;  '/' x  =>  y").
+        format "z ;  '/' '[' k  =>  v ']'").
 
-Notation "… x" := (x) (in custom maps at level 80, x constr at level 80).
+Notation "… m" := (m) (in custom maps at level 80, m constr at level 80).
 
 Declare Scope maps_scope.
 Delimit Scope maps_scope with maps.
