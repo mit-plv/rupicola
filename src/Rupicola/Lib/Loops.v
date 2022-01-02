@@ -1355,10 +1355,10 @@ Section with_parameters.
   Section Generic.
     Context (signed: bool).
 
-    Definition cmd_loop (signed: bool) from_var to_expr body_impl :=
+    Definition cmd_loop (signed: bool) idx_var to_expr body_impl :=
       cmd.while
         (expr.op (if signed then bopname.lts else bopname.ltu)
-                 (expr.var from_var) to_expr)
+                 (expr.var idx_var) to_expr)
         body_impl.
 
     Lemma _compile_ranged_for : forall A {tr mem locals functions}
@@ -1367,15 +1367,15 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: forall (idx: Z) (a: A), predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var: string) (to_expr: expr) vars,
+        (idx_var: string) (to_expr: expr) vars,
 
-        let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) to (from + 1) in
-            loop_pred from (snd tok_acc) tr mem locals in
+        let lp idx tok_acc tr mem locals :=
+            let idx := ExitToken.branch (fst tok_acc) to (idx + 1) in
+            loop_pred idx (snd tok_acc) tr mem locals in
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some (word.of_Z idx) /\
             WeakestPrecondition.dexpr mem locals to_expr (word.of_Z to)) ->
 
         loop_pred from a0 tr mem locals ->
@@ -1385,25 +1385,25 @@ Section with_parameters.
 
         ((* loop body *)
           let lp := lp in
-          forall tr mem locals from'
-            (Hl: from - 1 < from')
-            (Hr: from' < to)
-            (Hr': from' <= to),
-            let a := ranged_for' from from' (wbody body pr Hr') a0 in
+          forall tr mem locals idx
+            (Hl: from - 1 < idx)
+            (Hr: idx < to)
+            (Hr': idx <= to),
+            let a := ranged_for' from idx (wbody body pr Hr') a0 in
             let prev_tok := fst a in
             let acc := snd a in  (* FIXME use primitive projections? *)
             ExitToken.get prev_tok = false ->
-            loop_pred from' acc tr mem locals ->
+            loop_pred idx acc tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body acc ExitToken.new from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body acc ExitToken.new idx (conj Hl Hr)) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := Z.max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := Z.max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -1415,7 +1415,7 @@ Section with_parameters.
            Locals := locals;
            Functions := functions }>
         cmd.seq
-          (cmd_loop signed from_var to_expr body_impl)
+          (cmd_loop signed idx_var to_expr body_impl)
           k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
@@ -1443,12 +1443,12 @@ Section with_parameters.
           subst v. rewrite ranged_for_exit; eauto || lia. }
 
       pose (inv := (fun n tr mem locals =>
-                     exists from' (Hr: from' <= to),
-                       from <= from' /\
-                       n = Z.to_nat (to - from') /\
-                       let a := ranged_for' from from' (wbody body pr Hr) a0 in
-                       (from' < to -> ExitToken.get (fst a) = false) /\
-                       loop_pred from' (snd a) tr mem locals)).
+                     exists idx (Hr: idx <= to),
+                       from <= idx /\
+                       n = Z.to_nat (to - idx) /\
+                       let a := ranged_for' from idx (wbody body pr Hr) a0 in
+                       (idx < to -> ExitToken.get (fst a) = false) /\
+                       loop_pred idx (snd a) tr mem locals)).
 
       red. red.
 
@@ -1465,7 +1465,7 @@ Section with_parameters.
             rewrite ranged_for_break_exit by lia.
           eauto. }
         intros niters * Hinv.
-        destruct Hinv as (from' & Hl & Hr & -> & Hcontinue & Hpred).
+        destruct Hinv as (idx & Hl & Hr & -> & Hcontinue & Hpred).
         eexists ?[b]; split; [|split].
         { (* loop test can be eval'd *)
           eexists; split; eauto.
@@ -1474,8 +1474,8 @@ Section with_parameters.
             rewrite <- ?word.morph_lts, <- ?word.morph_ltu by lia;
             reflexivity. }
         all:
-          pose proof Zlt_cases from' to;
-          intros Hnz; destruct (from' <? to);
+          pose proof Zlt_cases idx to;
+          intros Hnz; destruct (idx <? to);
             try (rewrite ?word.unsigned_of_Z_0, ?word.unsigned_of_Z_1 in Hnz;
                  congruence); [].
 
@@ -1488,16 +1488,16 @@ Section with_parameters.
           { (* Invariant proof *)
             subst lp; cbv beta.
             set (body _ _ _ _) as acc_tok in *.
-            set (ExitToken.branch (fst acc_tok) to (from' + 1)) as from'' in *.
+            set (ExitToken.branch (fst acc_tok) to (idx + 1)) as idx' in *.
 
             intros * Hlp.
-            exists (Z.to_nat (to - from'')); split.
+            exists (Z.to_nat (to - idx')); split.
 
             assert (exists h,
                        acc_tok =
-                       (ranged_for' from (from' + 1) (wbody body pr h) a0))
+                       (ranged_for' from (idx + 1) (wbody body pr h) a0))
               as [? Hrefold].
-            { exists (ltac:(lia): from' + 1 <= to).
+            { exists (ltac:(lia): idx + 1 <= to).
               subst acc_tok.
               erewrite @ranged_for'_unfold_r_nstop with (H := ?[H]).
               [H]: lia.
@@ -1507,18 +1507,18 @@ Section with_parameters.
                 intros; cbv beta; f_equal; (congruence || lia || apply range_unique). }
 
             { (* Invariant proof *)
-              exists from''.
+              exists idx'.
 
               unshelve eexists;
-                [subst from''; destruct (fst acc_tok); simpl; lia|].
+                [subst idx'; destruct (fst acc_tok); simpl; lia|].
               split;
-                [subst from''; destruct (fst acc_tok); simpl; lia|].
+                [subst idx'; destruct (fst acc_tok); simpl; lia|].
 
               split; [reflexivity|].
 
               split.
               { (* If index is < to, loop didn't exit *)
-                subst from'';
+                subst idx';
                   destruct (fst acc_tok) eqn:Htok; simpl in *;
                     [intros; exfalso; lia|].
                 intros; rewrite <- Htok, Hrefold by assumption.
@@ -1527,7 +1527,7 @@ Section with_parameters.
                   intros; cbv beta; f_equal; (congruence || lia || apply range_unique). }
 
               { (* Final invariant holds *)
-                subst from'';
+                subst idx';
                   destruct (fst acc_tok) eqn:Htok; simpl in *;
                     rewrite Hrefold in Hlp.
                 { (* Loop exited early *)
@@ -1542,26 +1542,26 @@ Section with_parameters.
                   intros; cbv beta; f_equal; (congruence || lia || apply range_unique). } } }
 
             { (* Variant decreased *)
-              subst from''. destruct (fst acc_tok); simpl; lia. } } }
+              subst idx'. destruct (fst acc_tok); simpl; lia. } } }
 
         { (* Loop end analysis *)
           cbv zeta in Hpred.
-          assert (from' = to) as Hend by lia; destruct Hend.
+          assert (idx = to) as Hend by lia; destruct Hend.
           eapply Hk.
           subst v.
           unfold ranged_for.
-          replace (Z.max from from') with from' by lia.
+          replace (Z.max from idx) with idx by lia.
           erewrite ranged_for'_Proper;
             [ eapply Hpred| .. ];
             intros; cbv beta; f_equal; (congruence || lia || apply range_unique). } }
     Qed.
 
-    Definition cmd_loop_incr signed from_var to_expr body_impl :=
-      cmd_loop signed from_var to_expr
+    Definition cmd_loop_incr signed idx_var to_expr body_impl :=
+      cmd_loop signed idx_var to_expr
                (cmd.seq body_impl
-                        (cmd.set from_var
+                        (cmd.set idx_var
                                  (expr.op bopname.add
-                                          (expr.var from_var)
+                                          (expr.var idx_var)
                                           (expr.literal 1)))).
 
     Lemma compile_ranged_for_with_auto_increment : forall A {tr mem locals functions}
@@ -1570,20 +1570,20 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: forall (idx: Z) (a: A), predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var: string) (to_expr: expr) vars,
+        (idx_var: string) (to_expr: expr) vars,
 
-        let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (to - 1) from in
-            loop_pred from (snd tok_acc) tr mem locals in
+        let lp idx tok_acc tr mem locals :=
+            let idx := ExitToken.branch (fst tok_acc) (to - 1) idx in
+            loop_pred idx (snd tok_acc) tr mem locals in
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some (word.of_Z idx) /\
             WeakestPrecondition.dexpr mem locals to_expr (word.of_Z to)) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var (word.of_Z idx'))) ->
 
         loop_pred from a0 tr mem locals ->
 
@@ -1592,25 +1592,25 @@ Section with_parameters.
 
         ((* loop body *)
           let lp := lp in
-          forall tr mem locals from'
-            (Hl: from - 1 < from')
-            (Hr: from' < to)
-            (Hr': from' <= to),
-            let a := ranged_for' from from' (wbody body pr Hr') a0 in
+          forall tr mem locals idx
+            (Hl: from - 1 < idx)
+            (Hr: idx < to)
+            (Hr': idx <= to),
+            let a := ranged_for' from idx (wbody body pr Hr') a0 in
             let prev_tok := fst a in
             let acc := snd a in  (* FIXME use primitive projections? *)
             ExitToken.get prev_tok = false ->
-            loop_pred from' acc tr mem locals ->
+            loop_pred idx acc tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body acc ExitToken.new from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body acc ExitToken.new idx (conj Hl Hr)) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := Z.max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := Z.max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -1622,7 +1622,7 @@ Section with_parameters.
            Locals := locals;
            Functions := functions }>
         cmd.seq
-          (cmd_loop_incr signed from_var to_expr body_impl)
+          (cmd_loop_incr signed idx_var to_expr body_impl)
           k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
@@ -1648,10 +1648,10 @@ Section with_parameters.
       red. red. eauto.
     Qed.
 
-    Definition cmd_loop_fresh signed from_var from_expr to_var to_expr body_impl k_impl :=
-      cmd.seq (cmd.set from_var from_expr)
+    Definition cmd_loop_fresh signed idx_var from_expr to_var to_expr body_impl k_impl :=
+      cmd.seq (cmd.set idx_var from_expr)
               (cmd.seq (cmd.set to_var to_expr)
-                       (cmd.seq (cmd_loop_incr signed from_var to_var body_impl)
+                       (cmd.seq (cmd_loop_incr signed idx_var to_var body_impl)
                        k_impl)).
 
     Lemma compile_ranged_for_fresh : forall A {tr mem locals functions}
@@ -1660,26 +1660,26 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: forall (idx: Z) (a: A), predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var to_var: string) (from_expr to_expr: expr) vars,
+        (idx_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var (word.of_Z from) in
+        let locals1 := map.put locals idx_var (word.of_Z from) in
         let locals2 := map.put locals1 to_var (word.of_Z to) in
 
         WeakestPrecondition.dexpr mem locals from_expr (word.of_Z from) ->
         WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
 
-        let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (to - 1) from in
-            loop_pred from (snd tok_acc) tr mem locals in
+        let lp idx tok_acc tr mem locals :=
+            let idx := ExitToken.branch (fst tok_acc) (to - 1) idx in
+            loop_pred idx (snd tok_acc) tr mem locals in
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some (word.of_Z idx) /\
             map.get locals to_var = Some (word.of_Z to)) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var (word.of_Z idx'))) ->
 
         loop_pred from a0 tr mem locals2 ->
 
@@ -1688,25 +1688,25 @@ Section with_parameters.
 
         ((* loop body *)
           let lp := lp in
-          forall tr mem locals from'
-            (Hl: from - 1 < from')
-            (Hr: from' < to)
-            (Hr': from' <= to),
-            let a := ranged_for' from from' (wbody body pr Hr') a0 in
+          forall tr mem locals idx
+            (Hl: from - 1 < idx)
+            (Hr: idx < to)
+            (Hr': idx <= to),
+            let a := ranged_for' from idx (wbody body pr Hr') a0 in
             let prev_tok := fst a in
             let acc := snd a in  (* FIXME use primitive projections? *)
             ExitToken.get prev_tok = false ->
-            loop_pred from' acc tr mem locals ->
+            loop_pred idx acc tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body acc ExitToken.new from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body acc ExitToken.new idx (conj Hl Hr)) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := Z.max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := Z.max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -1717,7 +1717,7 @@ Section with_parameters.
            Memory := mem;
            Locals := locals;
            Functions := functions }>
-        cmd_loop_fresh signed from_var from_expr to_var to_expr body_impl k_impl
+        cmd_loop_fresh signed idx_var from_expr to_var to_expr body_impl k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
       intros; unfold cmd_loop_fresh.
@@ -1732,22 +1732,22 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: forall (idx: Z) (a: A), predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var to_var: string) (from_expr to_expr: expr) vars,
+        (idx_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var (word.of_Z from) in
+        let locals1 := map.put locals idx_var (word.of_Z from) in
         let locals2 := map.put locals1 to_var (word.of_Z to) in
 
         WeakestPrecondition.dexpr mem locals from_expr (word.of_Z from) ->
         WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some (word.of_Z idx) /\
             map.get locals to_var = Some (word.of_Z to)) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var (word.of_Z idx'))) ->
 
         loop_pred from a0 tr mem locals2 ->
 
@@ -1756,22 +1756,22 @@ Section with_parameters.
 
         ((* loop body *)
           let lp := loop_pred in
-          forall tr mem locals from'
-            (Hl: from - 1 < from')
-            (Hr: from' < to)
-            (Hr': from' <= to),
-            let acc := ranged_for_all from from' (wbody_all body pr Hr') a0 in
-            loop_pred from' acc tr mem locals ->
+          forall tr mem locals idx
+            (Hl: from - 1 < idx)
+            (Hr: idx < to)
+            (Hr': idx <= to),
+            let acc := ranged_for_all from idx (wbody_all body pr Hr') a0 in
+            loop_pred idx acc tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body acc from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body acc idx (conj Hl Hr)) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := Z.max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := Z.max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -1782,7 +1782,7 @@ Section with_parameters.
            Memory := mem;
            Locals := locals;
            Functions := functions }>
-        cmd_loop_fresh signed from_var from_expr to_var to_expr body_impl k_impl
+        cmd_loop_fresh signed idx_var from_expr to_var to_expr body_impl k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
       cbv zeta; intros until P.
@@ -1799,22 +1799,22 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: forall (idx: Z) (a: A), predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var to_var: string) (from_expr to_expr: expr) vars,
+        (idx_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var (word.of_Z from) in
+        let locals1 := map.put locals idx_var (word.of_Z from) in
         let locals2 := map.put locals1 to_var (word.of_Z to) in
 
         WeakestPrecondition.dexpr mem locals from_expr (word.of_Z from) ->
         WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some (word.of_Z idx) /\
             map.get locals to_var = Some (word.of_Z to)) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var (word.of_Z idx'))) ->
 
         loop_pred from a0 tr mem locals2 ->
 
@@ -1823,22 +1823,22 @@ Section with_parameters.
 
         ((* loop body *)
           let lp := loop_pred in
-          forall tr mem locals from'
-            (Hl: from - 1 < from')
-            (Hr: from' < to)
-            (Hr': from' <= to),
-            let acc := nd_ranged_for_all from from' body a0 in
-            loop_pred from' acc tr mem locals ->
+          forall tr mem locals idx
+            (Hl: from - 1 < idx)
+            (Hr: idx < to)
+            (Hr': idx <= to),
+            let acc := nd_ranged_for_all from idx body a0 in
+            loop_pred idx acc tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body acc from') }>)) ->
+             <{ lp idx (body acc idx) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := Z.max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := Z.max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -1849,7 +1849,7 @@ Section with_parameters.
            Memory := mem;
            Locals := locals;
            Functions := functions }>
-        cmd_loop_fresh signed from_var from_expr to_var to_expr body_impl k_impl
+        cmd_loop_fresh signed idx_var from_expr to_var to_expr body_impl k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
       cbv zeta; intros until P.
@@ -1881,46 +1881,46 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: word -> A -> predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var to_var: string) vars,
+        (idx_var to_var: string) vars,
 
-        let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) from in
-            loop_pred from (snd tok_acc) tr mem locals in
+        let lp idx tok_acc tr mem locals :=
+            let idx := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) idx in
+            loop_pred idx (snd tok_acc) tr mem locals in
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some from /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some idx /\
             WeakestPrecondition.dexpr mem locals to_var to) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var from')) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var idx')) ->
 
         loop_pred from a0 tr mem locals ->
 
         ((* loop body *)
           let lp := lp in
-          forall tr mem locals from'
-            (Hl: to_Z from - 1 < to_Z from')
-            (Hr: to_Z from' < to_Z to)
-            (Hr': to_Z from' <= to_Z to),
+          forall tr mem locals idx
+            (Hl: to_Z from - 1 < to_Z idx)
+            (Hr: to_Z idx < to_Z to)
+            (Hr': to_Z idx <= to_Z to),
             let tok := ExitToken.new in
-            let a := ranged_for' (to_Z from) (to_Z from')
+            let a := ranged_for' (to_Z from) (to_Z idx)
                                 (w_body_tok _ _ to_Z_of_Z
                                             (wbody body pr Hr')) a0 in
             ExitToken.get (fst a) = false ->
 
-            loop_pred from' (snd a) tr mem locals ->
+            loop_pred idx (snd a) tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body (snd a) tok from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body (snd a) tok idx (conj Hl Hr)) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -1932,7 +1932,7 @@ Section with_parameters.
            Locals := locals;
            Functions := functions }>
         cmd.seq
-          (cmd_loop_incr signed from_var to_var body_impl)
+          (cmd_loop_incr signed idx_var to_var body_impl)
           k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
@@ -1946,7 +1946,7 @@ Section with_parameters.
       - rewrite of_Z_to_Z; eassumption.
       - eassumption.
       - intros.
-        assert (exists h, a = ranged_for' (to_Z from) (to_Z (word.of_Z from')) (w_body_tok from (word.of_Z from') to_Z_of_Z (wbody body pr h)) a0) as [h eqn].
+        assert (exists h, a = ranged_for' (to_Z from) (to_Z (word.of_Z idx)) (w_body_tok from (word.of_Z idx) to_Z_of_Z (wbody body pr h)) a0) as [h eqn].
         { unshelve eexists; subst a.
           { rewrite (to_Z_of_Z from to); lia. }
           unshelve apply ranged_for'_Proper; reflexivity || eauto.
@@ -1983,46 +1983,46 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: word -> A -> predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var to_var: string) vars,
+        (idx_var to_var: string) vars,
 
-        let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) from in
-            loop_pred from (snd tok_acc) tr mem locals in
+        let lp idx tok_acc tr mem locals :=
+            let idx := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) idx in
+            loop_pred idx (snd tok_acc) tr mem locals in
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some from /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some idx /\
             WeakestPrecondition.dexpr mem locals to_var to) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var from')) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var idx')) ->
 
         loop_pred from a0 tr mem locals ->
 
         ((* loop body *)
           let lp := lp in
-          forall tr mem locals from'
-            (Hl: to_Z from - 1 < to_Z from')
-            (Hr: to_Z from' < to_Z to)
-            (Hr': to_Z from' <= to_Z to),
+          forall tr mem locals idx
+            (Hl: to_Z from - 1 < to_Z idx)
+            (Hr: to_Z idx < to_Z to)
+            (Hr': to_Z idx <= to_Z to),
             let tok := ExitToken.new in
-            let a := ranged_for' (to_Z from) (to_Z from')
+            let a := ranged_for' (to_Z from) (to_Z idx)
                                 (w_body_tok _ _ to_Z_of_Z
                                             (wbody body pr Hr')) a0 in
             ExitToken.get (fst a) = false ->
 
-            loop_pred from' (snd a) tr mem locals ->
+            loop_pred idx (snd a) tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body (snd a) tok from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body (snd a) tok idx (conj Hl Hr)) }>)) ->
         (let v0 := v0 in
          forall tr mem locals,
-           let from' := max from to in
-           loop_pred from' v0 tr mem locals ->
+           let idx := max from to in
+           loop_pred idx v0 tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -2034,9 +2034,9 @@ Section with_parameters.
            Locals := locals;
            Functions := functions }>
         cmd.seq
-          (cmd_loop_incr signed from_var to_var body_impl)
+          (cmd_loop_incr signed idx_var to_var body_impl)
           k_impl
-        <{ pred (nlet_eq (from_var :: vars) v k) }>.
+        <{ pred (nlet_eq (idx_var :: vars) v k) }>.
     Proof.
       intros;
         eapply compile_ranged_for_w
@@ -2054,52 +2054,52 @@ Section with_parameters.
       forall {P} {pred: P v -> predicate}
         (loop_pred: word -> A -> predicate)
         {k: nlet_eq_k P v} {k_impl} {body_impl}
-        (from_var to_var: string) (from_expr to_expr: expr) vars,
+        (idx_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var from in
+        let locals1 := map.put locals idx_var from in
         let locals2 := map.put locals1 to_var to in
 
         WeakestPrecondition.dexpr mem locals from_expr from ->
         WeakestPrecondition.dexpr mem locals1 to_expr to ->
 
-        let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) from in
-            loop_pred from (snd tok_acc) tr mem locals in
+        let lp idx tok_acc tr mem locals :=
+            let idx := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) idx in
+            loop_pred idx (snd tok_acc) tr mem locals in
 
-        (forall from a0 tr mem locals,
-            loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some from /\
+        (forall idx a0 tr mem locals,
+            loop_pred idx a0 tr mem locals ->
+            map.get locals idx_var = Some idx /\
             map.get locals to_var = Some to) ->
 
-        (forall from from' acc tr mem locals,
-            loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var from')) ->
+        (forall idx idx' acc tr mem locals,
+            loop_pred idx acc tr mem locals ->
+            loop_pred idx' acc tr mem (map.put locals idx_var idx')) ->
 
         loop_pred from a0 tr mem locals2 ->
 
         ((* loop body *)
           let lp := lp in
-          forall tr mem locals from'
-            (Hl: to_Z from - 1 < to_Z from')
-            (Hr: to_Z from' < to_Z to)
-            (Hr': to_Z from' <= to_Z to),
+          forall tr mem locals idx
+            (Hl: to_Z from - 1 < to_Z idx)
+            (Hr: to_Z idx < to_Z to)
+            (Hr': to_Z idx <= to_Z to),
             let tok := ExitToken.new in
-            let a := ranged_for' (to_Z from) (to_Z from')
+            let a := ranged_for' (to_Z from) (to_Z idx)
                                 (w_body_tok _ _ to_Z_of_Z
                                             (wbody body pr Hr')) a0 in
             ExitToken.get (fst a) = false ->
 
-            loop_pred from' (snd a) tr mem locals ->
+            loop_pred idx (snd a) tr mem locals ->
             (<{ Trace := tr;
                 Memory := mem;
                 Locals := locals;
                 Functions := functions }>
              body_impl
-             <{ lp from' (body (snd a) tok from' (conj Hl Hr)) }>)) ->
+             <{ lp idx (body (snd a) tok idx (conj Hl Hr)) }>)) ->
         (let v := v in
          forall tr mem locals,
-           let from' := max from to in
-           loop_pred from' v tr mem locals ->
+           let idx := max from to in
+           loop_pred idx v tr mem locals ->
            (<{ Trace := tr;
                Memory := mem;
                Locals := locals;
@@ -2110,7 +2110,7 @@ Section with_parameters.
            Memory := mem;
            Locals := locals;
            Functions := functions }>
-        cmd_loop_fresh signed from_var from_expr to_var to_expr body_impl k_impl
+        cmd_loop_fresh signed idx_var from_expr to_var to_expr body_impl k_impl
         <{ pred (nlet_eq vars v k) }>.
     Proof.
       intros; unfold cmd_loop_fresh.
@@ -2214,10 +2214,10 @@ Section with_parameters.
       erewrite (map_as_nd_ranged_for_all f f' Hrp a).
       intros; eapply compile_nd_ranged_for_all_fresh; reflexivity || lia || eauto.
       - intros; cbn; eapply WeakestPrecondition_weaken.
-        2: eapply H4 with (idx := from'); try lia; [].
+        2: eapply H4 with (idx := idx); try lia; [].
         all: erewrite map_firstn_as_nd_ranged_for_all, Z2Nat.id;
           eauto using Hrp; lia.
-      - intros; subst from'; rewrite Z.max_r in * by lia; eauto.
+      - intros; subst idx; rewrite Z.max_r in * by lia; eauto.
     Qed.
   End Maps.
 
@@ -2285,36 +2285,36 @@ Section with_parameters.
       erewrite (copying_fold_left_as_nd_ranged_for_all f f' bs Hrp).
       intros; eapply compile_nd_ranged_for_all_fresh; reflexivity || lia || eauto.
       - intros; cbn; eapply WeakestPrecondition_weaken.
-        2: eapply H4 with (idx := from'); try lia; [].
+        2: eapply H4 with (idx := idx); try lia; [].
         all: erewrite copying_fold_left_firstn_as_nd_ranged_for_all;
           eauto using Hrp; lia.
-      - intros; subst from'; rewrite Z.max_r in * by lia; eauto.
+      - intros; subst idx; rewrite Z.max_r in * by lia; eauto.
     Qed.
   End CopyingFolds.
 End with_parameters.
 
-Ltac make_ranged_for_predicate from_var from_arg to_var to_val vars args tr pred locals :=
-  lazymatch substitute_target from_var from_arg pred locals with
+Ltac make_ranged_for_predicate idx_var idx_arg to_var to_val vars args tr pred locals :=
+  lazymatch substitute_target idx_var idx_arg pred locals with
   | (?pred, ?locals) =>
     lazymatch substitute_target to_var to_val pred locals with
     | (?pred, ?locals) => make_predicate vars args tr pred locals
     end
   end.
 
-Ltac infer_ranged_for_predicate' from_var to_var to_val argstype vars tr pred locals :=
+Ltac infer_ranged_for_predicate' idx_var to_var to_val argstype vars tr pred locals :=
   (** Like `make_predicate`, but with a binding for `idx` at the front. *)
   let idxtype := type of to_val in
   let val_pred :=
       constr:(fun (idx: idxtype) (args: argstype) =>
                 ltac:(let f := make_ranged_for_predicate
-                                from_var idx to_var to_val
+                                idx_var idx to_var to_val
                                 vars args tr pred locals in
                       exact f)) in
   eval cbv beta in val_pred.
 
-Ltac infer_ranged_for_predicate from_var to_var to_val :=
+Ltac infer_ranged_for_predicate idx_var to_var to_val :=
   _infer_predicate_from_context
-    ltac:(infer_ranged_for_predicate' from_var to_var to_val).
+    ltac:(infer_ranged_for_predicate' idx_var to_var to_val).
 
 Ltac make_ranged_for_continued_predicate idxvar idxarg vars args tr pred locals :=
   lazymatch substitute_target idxvar idxarg pred locals with
@@ -2355,10 +2355,10 @@ Ltac compile_ranged_for_continued :=
   end.
 
 Ltac _compile_ranged_for locals to thm :=
-  let from_v := gensym locals "from" in
+  let idx_v := gensym locals "idx" in
   let to_v := gensym locals "to" in
-  let lp := infer_ranged_for_predicate from_v to_v to in
-  eapply thm with (from_var := from_v) (to_var := to_v) (loop_pred := lp).
+  let lp := infer_ranged_for_predicate idx_v to_v to in
+  eapply thm with (idx_var := idx_v) (to_var := to_v) (loop_pred := lp).
 
 Ltac compile_ranged_for :=
   lazymatch goal with
