@@ -18,3 +18,14 @@ static void buffer_fill(uint8_t *p, size_t z)
     uint8_t *end = p + z;
     while (p < end) *p++ = pcg32(&s);
 }
+
+#if defined(MAIN)
+#include <stdio.h>
+int main() {
+  uint8_t buf[1024 * 1024];
+  buffer_fill(buf, sizeof(buf));
+  FILE *f = fopen("testdata.bin", "wb");
+  fwrite(buf, sizeof(buf), 1, f);
+  fclose(f);
+}
+#endif
