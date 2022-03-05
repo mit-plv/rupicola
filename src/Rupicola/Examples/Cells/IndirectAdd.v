@@ -38,8 +38,6 @@ Section with_parameters.
     compile.
   Qed.
 
-  (* FIXME auto-generate lemma from pre-post condition pair? *)
-
   Lemma compile_indirect_add : forall {tr mem locals functions} a b c,
     let v := indirect_add b c in
     forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
