@@ -56,8 +56,11 @@ deps: bedrock2
 
 cleanall: clean clean-coqutil clean-bedrock2
 
+validate:
+	+$(MAKE) -f Makefile.coq validate
+
 %.vo: deps Makefile.coq
-	+make -f Makefile.coq $@
+	+$(MAKE) -f Makefile.coq $@
 
 _CoqProject: Makefile
 	@echo "-R src/Rupicola Rupicola" > $@
