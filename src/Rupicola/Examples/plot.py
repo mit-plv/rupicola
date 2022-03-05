@@ -1,8 +1,7 @@
 #!/usr/bin/python3
 
+from sys import stderr
 import pandas, seaborn, matplotlib.pyplot
-from latest_benchmark_results import data as c_data
-from latest_benchmark_ocaml_results import data as ocaml_data
 
 ALIASES = {
     'benchmark': [
@@ -22,6 +21,7 @@ ALIASES = {
         ("clang-11.0.0", "Clang 11.0"),
         ("clang-12.0.0", "Clang 12.0"),
         ("clang-13.0.1", "Clang 13.0"),
+        ("ocamlopt-4.07.0", "ocamlopt 4.07"),
         ("ocamlopt-4.09.0", "ocamlopt 4.09")
     ],
     'language': [
@@ -48,6 +48,11 @@ COLORS = {
     ('Clang 11.0',    'Rupicola'):               '#ce5c00',
     ('Clang 12.0',    'Rupicola'):               '#f57900',
     ('Clang 13.0',    'Rupicola'):               '#fcaf3e',
+
+    ('ocamlopt 4.07', 'Coq/OCaml Impl'):         '#a40000',
+    ('ocamlopt 4.07', 'Coq/OCaml'):              '#cc0000',
+    ('ocamlopt 4.07', 'Coq/OCaml Impl (sound)'): '#ef2929',
+    ('ocamlopt 4.07', 'Coq/OCaml (sound)'):      '#ef2929',
 
     ('ocamlopt 4.09', 'Coq/OCaml Impl'):         '#a40000',
     ('ocamlopt 4.09', 'Coq/OCaml'):              '#cc0000',
@@ -99,6 +104,11 @@ def add_plot(data, configs, xlabel, selected_benchmarks=None, ax=None, logmin=Fa
     return ax
 
 def c_benchmarks():
+    try:
+        from latest_benchmark_results import data as c_data
+    except ImportError:
+        print("Skipping C tests", file=stderr)
+        return
     fig = matplotlib.pyplot.figure(figsize=(8, 7))
 
     CONFIGS = [k for k in COLORS if "ocaml" not in k[0]]
@@ -112,6 +122,11 @@ def c_benchmarks():
     fig.savefig("benchmarks.pdf")
 
 def ocaml_benchmarks():
+    try:
+        from latest_benchmark_ocaml_results import data as ocaml_data
+    except ImportError:
+        print("Skipping OCaml tests", file=stderr)
+        return
     fig = matplotlib.pyplot.figure(figsize=(8, 7))
 
     CONFIGS = [
