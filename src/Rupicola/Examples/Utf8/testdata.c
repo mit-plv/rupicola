@@ -57,6 +57,7 @@ randchar(uint64_t *s)
         case 4:
             return 65536 + r % (131072 - 65536);
     }
+    __builtin_unreachable();
 }
 
 /* Fill buffer with random characters, with evenly-distributed encoded
