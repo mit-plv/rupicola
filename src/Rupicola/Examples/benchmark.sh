@@ -8,7 +8,7 @@ COMPILERS="clang-11 clang-12 clang-13 gcc-9 gcc-10 gcc-11"
 	printf 'data=[\n'
 	for CC in $COMPILERS; do
         if command -v $CC; then
-		    find . -name ubench.sh | xargs -n1 env CC="$CC" CFLAGS="-O3 -march=native" sh
+		    find . -name ubench.sh | xargs -n1 env CC="$CC" CFLAGS="-O3" sh
         fi
 	done
 	printf ']\n'
