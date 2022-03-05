@@ -14,4 +14,4 @@ CC="${CC:-cc}"
 CFLAGS="${CFLAGS:--O3}"
 
 cc -DMAIN testdata.c -o testdata.exe && ./testdata.exe && rm testdata.exe
-ulimit -s unlimited; taskset -c 2 dune exec --profile=release ./ubench_ocaml.exe "$(ocamlc -version)"
+ulimit -s unlimited; taskset -c 1 dune exec --profile=release ./ubench_ocaml.exe "$(ocamlc -version)"
