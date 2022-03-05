@@ -8,7 +8,9 @@ COMPILERS="clang-11 clang-12 clang-13 gcc-9 gcc-10 gcc-11"
 	printf 'data=[\n'
 	find Net/IPChecksum -name 'ubench_ocaml.sh' | xargs -n1 env CC="clang" CFLAGS="-O3" sh
 	for CC in $COMPILERS; do
-		find Net/IPChecksum -name 'ubench.sh' | xargs -n1 env CC="$CC" CFLAGS="-O3" sh
+        if [ -x "$(command -v "$CC")" ]; then
+		    find Net/IPChecksum -name 'ubench.sh' | xargs -n1 env CC="$CC" CFLAGS="-O3" sh
+        fi
 	done
 	printf ']\n'
 } | tee latest_benchmark_ocaml_results.py
