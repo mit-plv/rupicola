@@ -1,0 +1,9 @@
+(executable
+ (name ubench_ocaml)
+ (libraries ocaml_intrinsics stdlib-shims zarith))
+
+(env
+  (release
+   (ocamlopt_flags (:standard -w -39 -alert -deprecated -O3 \ -g)))
+  (dev
+    (flags (:standard -w -39 -alert -deprecated))))
