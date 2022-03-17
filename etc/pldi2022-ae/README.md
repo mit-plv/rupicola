@@ -44,9 +44,11 @@ remained despite our testing.  Thanks!
 That's it!
 
 Note: If you want to replicate this VM, it's very easy: it was created by
-cloning the `pldi2022-ae` branch of our repository and running
+cloning the `pldi2022-ae` branch of our repository (with `--recursive`) and running
 `etc/pldi2022-ae/setup.sh`.  The repository itself can be found at
-<https://github.com/mit-plv/rupicola.git> .
+<https://github.com/mit-plv/rupicola.git> , and more detailed instructions for
+[running Rupicola on your own machine](#running-on-your-own-machine) are at the
+bottom of this document.
 
 ## Step-by-step guide
 
