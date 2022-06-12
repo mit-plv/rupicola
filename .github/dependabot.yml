@@ -12,6 +12,6 @@ updates:
   - package-ecosystem: "gitsubmodule"
     directory: "/"
     schedule:
-      interval: "yearly"
+      interval: "monthly"
     labels:
       - "submodules"
