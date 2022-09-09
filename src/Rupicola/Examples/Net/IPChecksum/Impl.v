@@ -4,8 +4,13 @@ Require Export
         Rupicola.Lib.Loops
         Rupicola.Lib.WordNotations
         Rupicola.Examples.Net.IPChecksum.Spec.
-Require Export
-        bedrock2.BasicC32Semantics.
+Require Import
+        bedrock2.FE310CSemantics
+        coqutil.Word.Naive
+        coqutil.Map.SortedListWord.
+#[export]
+Existing Instances Word.Naive.word Word.Naive.word32_ok SortedListWord.map SortedListWord.ok.
+Notation word := word32.
 
 Coercion co_word_of_Z := word.of_Z (word := word).
 Coercion co_word_of_byte (b: byte) : word := word_of_byte b.

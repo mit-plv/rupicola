@@ -5,7 +5,7 @@ Instance spec_of_ip_checksum : spec_of "ip_checksum" :=
   fnspec! "ip_checksum" data_ptr wlen / (data : list byte) R ~> chk,
     { requires tr mem :=
         wlen = word.of_Z (Z.of_nat (length data)) /\
-        Z.of_nat (Datatypes.length data) < 2 ^ 32 /\ (* FIXME implied by sep *)
+        Z.of_nat (Datatypes.length data) < 2 ^ 32 /\
         (listarray_value AccessByte data_ptr data * R)%sep mem;
       ensures tr' mem' :=
         tr' = tr /\
