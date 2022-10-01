@@ -4,13 +4,8 @@
 LIBDIR := $(shell cygpath -m "$$(pwd)" 2>/dev/null || pwd)/src/Rupicola/Lib
 ALLDIR := $(shell cygpath -m "$$(pwd)" 2>/dev/null || pwd)/src/Rupicola
 
-# use git ls-files if we can to avoid building non-checked-in cruft;
-# use find when building from a tarball
-ifneq (,$(wildcard .git/))
-find_vs = $(shell git ls-files "$(1)/*.v")
-else
+# git-ls-files does not work with cygpath -m
 find_vs = $(shell find "$(1)" -type f -name '*.v')
-endif
 # absolute paths so that emacs compile mode knows where to find error
 VS_LIB:=$(abspath $(call find_vs,$(LIBDIR)))
 VS_ALL:=$(abspath $(call find_vs,$(ALLDIR)))
@@ -45,12 +40,19 @@ EXTERNAL_DEPENDENCIES?=
 EXTERNAL_COQUTIL?=
 EXTERNAL_BEDROCK2?=
 
+# this is needed on Windows to get make to see .vo files in -Q dependencies
+ifneq ($(filter /cygdrive/%,$(CURDIR)),)
+CURDIR_SAFE := $(shell cygpath -m "$(CURDIR)")
+else
+CURDIR_SAFE := $(CURDIR)
+endif
+
 COQUTIL_FOLDER := bedrock2/deps/coqutil
 BEDROCK2_FOLDER := bedrock2/bedrock2
 
 # Note: make does not interpret "\n", and this is intended
-DEPFLAGS_COQUTIL_NL=-Q $(COQUTIL_FOLDER)/src/coqutil coqutil\n
-DEPFLAGS_BEDROCK2_NL=-Q $(BEDROCK2_FOLDER)/src/bedrock2 bedrock2\n
+DEPFLAGS_COQUTIL_NL=-Q ${CURDIR_SAFE}/$(COQUTIL_FOLDER)/src/coqutil coqutil\n
+DEPFLAGS_BEDROCK2_NL=-Q ${CURDIR_SAFE}/$(BEDROCK2_FOLDER)/src/bedrock2 bedrock2\n
 CURFLAGS_NL=-R src/Rupicola Rupicola\n-arg -w\n-arg -unexpected-implicit-declaration,-deprecated-ident-entry\n
 DEPFLAGS_NL=
 
