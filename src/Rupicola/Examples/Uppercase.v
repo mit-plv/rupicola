@@ -91,4 +91,4 @@ Section Upstr.
 End Upstr.
 
 Definition upstr_cbytes := Eval vm_compute in
-  list_byte_of_string (ToCString.c_module [upstr_br2fn]).
+  list_byte_of_string (ToCString.c_module [("upstr",upstr_br2fn)]).

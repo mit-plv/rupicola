@@ -19,12 +19,12 @@ Import Swap.Bedrock2.
 Local Infix "~>" := scalar (at level 40, only parsing).
 
 Section Proofs.
-  Instance spec_of_swap : spec_of swap :=
+  Instance spec_of_swap : spec_of "swap" :=
     fun functions =>
       forall a_ptr a b_ptr b tr R mem,
         seps [a_ptr ~> a; b_ptr ~> b; R] mem ->
         WeakestPrecondition.call
-          functions swap tr mem [a_ptr; b_ptr]
+          functions "swap" tr mem [a_ptr; b_ptr]
           (fun tr' mem' rets =>
              tr = tr' /\ rets = nil
              /\ seps [a_ptr ~> b; b_ptr ~> a; R] mem').

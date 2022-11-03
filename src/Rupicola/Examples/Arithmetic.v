@@ -128,8 +128,8 @@ End Murmur3.
 
 Require Import Rupicola.Lib.ToCString.
 Definition fnv1a64_update_cbytes := Eval vm_compute in
-  list_byte_of_string (c_module [FNV1A64.update_br2fn]).
+  list_byte_of_string (c_module [("update", FNV1A64.update_br2fn)]).
 Definition fnv1a64_cbytes := Eval vm_compute in
-  list_byte_of_string (c_module [FNV1A64.fnv1a_br2fn]).
+  list_byte_of_string (c_module [("fnv1a",FNV1A64.fnv1a_br2fn)]).
 Definition murmur3_scramble_cbytes := Eval vm_compute in
-  list_byte_of_string (c_module [("dummy_main_for_static",([],[],cmd.skip)); Murmur3.scramble_br2fn]).
+  list_byte_of_string (c_module [("dummy_main_for_static",([],[],cmd.skip)); ("scramble", Murmur3.scramble_br2fn)]).

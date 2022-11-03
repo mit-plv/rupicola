@@ -174,7 +174,7 @@ Ltac listsimplify :=
          end.
 
 Section Proofs.
-  Context (functions' : list func)
+  Context (functions' : list (string * func))
           (toupper_body : Byte.byte -> Byte.byte).
 
   Local Definition byte_to_word : Byte.byte -> word :=
@@ -303,11 +303,11 @@ Section Proofs.
     forall tr mem R,
       sep (String addr s) R mem ->
       len s = length (chars s) ->
-      let functions := (capitalize_String :: functions') in
+      let functions := (("capitalize_String",capitalize_String) :: functions') in
       let caps :=
           Gallina.capitalize_String (toupper:=toupper_body) s in
       WeakestPrecondition.call
-        functions capitalize_String tr mem [addr]
+        functions "capitalize_String" tr mem [addr]
         (fun tr' mem' rets =>
            let success := word.unsigned (hd (word.of_Z 0) rets) in
            tr = tr' /\
@@ -322,7 +322,7 @@ Section Proofs.
     (* finding the function to call *)
     cbn [WeakestPrecondition.call
            WeakestPrecondition.call_body
-           capitalize_String name_of_func fst].
+           capitalize_String fst].
     match goal with |- if String.eqb ?x ?x then _ else _ =>
                     destr (String.eqb x x) end;
       [ | congruence ].
@@ -711,11 +711,11 @@ Section Proofs.
       (* there are at least 3 strings *)
       (3 <= length strings)%nat ->
       let functions :=
-          (capitalize_3rd :: capitalize_String :: functions') in
+          (pair "capitalize_3rd" capitalize_3rd :: pair "capitalize_String" capitalize_String :: functions') in
       let caps :=
           Gallina.capitalize_3rd (toupper:=toupper_body) strings in
       WeakestPrecondition.call
-        functions capitalize_3rd tr mem [inp]
+        functions "capitalize_3rd" tr mem [inp]
         (fun tr' mem' rets =>
            let success := word.unsigned (hd (word.of_Z 0) rets) in
            tr = tr' /\
@@ -734,7 +734,7 @@ Section Proofs.
     (* finding the function to call *)
     cbn [WeakestPrecondition.call].
     cbn [WeakestPrecondition.call_body
-           capitalize_3rd name_of_func fst].
+           capitalize_3rd fst].
     match goal with |- if String.eqb ?x ?x then _ else _ =>
                     destr (String.eqb x x) end;
       [ | congruence ].

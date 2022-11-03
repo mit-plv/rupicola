@@ -84,4 +84,4 @@ Time Qed.
 Definition utf8_decode_cbytes := Eval vm_compute in
   list_byte_of_string (ToCString.c_module
     [("dummy_main_to_make_impl_get_inlined", ([], [], cmd.skip));
-     utf8_decode_br2fn]).
+     &,utf8_decode_br2fn]).

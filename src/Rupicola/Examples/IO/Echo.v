@@ -176,8 +176,10 @@ Section Echo.
   Qed.
 End Echo.
 
+(*
 From bedrock2 Require Import BasicC64Semantics NotationsCustomEntry.
 Compute io_sum_br2fn. (* (word := word) *)
-Compute ToCString.c_func io_echo_br2fn.
-Compute ToCString.c_func io_sum_br2fn.
-Compute ToCString.c_func (io_check_br2fn (word := word)).
+Compute ToCString.c_func ("io_echo", io_echo_br2fn).
+Compute ToCString.c_func ("io_sum", io_sum_br2fn).
+Compute ToCString.c_func ("io_check", (io_check_br2fn (word := word))).
+*)

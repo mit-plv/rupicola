@@ -1,7 +1,7 @@
 From Coq Require List.
-Require Import bedrock2.Memory.
 Require Import Rupicola.Lib.Core.
 Require Import Rupicola.Lib.Notations.
+Require Import bedrock2.Memory.
 
 Module InlineTable.
   Section InlineTable.

@@ -62,4 +62,4 @@ Proof.
 Qed.
 
 Definition lxm_next_cbytes := Eval vm_compute in
-  list_byte_of_string (ToCString.c_module [("dummy_main_for_static",([],[],cmd.skip)); lxm_next_br2fn]).
+  list_byte_of_string (ToCString.c_module [("dummy_main_for_static",([],[],cmd.skip)); ("lxm_next",lxm_next_br2fn)]).

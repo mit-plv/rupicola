@@ -28,15 +28,15 @@ Section examples.
             {ok : @kv_parameters_ok  _ BW _ mem ops key Z Int kvp}.
 
     Existing Instances map_ok annotated_map_ok key_eq_dec.
-    Local Hint Extern 1 (spec_of (let (x, _) := let (_, get, _) := ops in get in x)) => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
-    Local Hint Extern 1 (spec_of (let (x, _) := let (_, _, put) := ops in put in x)) => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "put") => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
 
-    Instance spec_of_add : spec_of add :=
+    Instance spec_of_add : spec_of "add" :=
       fun functions =>
         forall px x py y pout old_out R tr mem,
           (Int px x * Int py y * Int pout old_out * R)%sep mem ->
           WeakestPrecondition.call
-            functions add tr mem [px; py; pout]
+            functions "add" tr mem [px; py; pout]
             (fun tr' mem' rets =>
                tr = tr'
                /\ rets = []
@@ -53,19 +53,16 @@ Section examples.
 
     (* like put, returns a boolean indicating whether the put was an
          overwrite, and stores the old value in v if the boolean is true *)
-    Definition put_sum : func :=
-      ("get_add_put",
-      (["m"; "k1"; "k2"; "k3"; "v"(*pre-allocated memory for a value*)], ["ret"],
-        bedrock_func_body:(
-          unpack! err, v1 = $get (m, k1) ;
-            require !err ;
-            unpack! err, v2 = $get (m, k2) ;
-            require !err ;
-            $add(v1,v2,v);
-            unpack! ret = $put (m, k3, v)
-      ))).
+    Definition put_sum := func! (m, k1, k2, k3, v) ~> ret {
+      unpack! err, v1 = get(m, k1) ;
+      require !err ;
+      unpack! err, v2 = get(m, k2) ;
+      require !err ;
+      add(v1,v2,v);
+      unpack! ret = put(m, k3, v)
+    }.
 
-    Instance spec_of_put_sum : spec_of put_sum :=
+    Instance spec_of_put_sum : spec_of "put_sum" :=
       fun functions =>
         forall pm m pk1 k1 pk2 k2 pk3 k3 pv v R tr mem,
           map.get m k1 <> None ->
@@ -74,7 +71,7 @@ Section examples.
           (Map pm m * Key pk1 k1 * Key pk2 k2 * Key pk3 k3
            * Int pv v * R)%sep mem ->
           WeakestPrecondition.call
-            functions put_sum tr mem [pm; pk1; pk2; pk3; pv]
+            functions "put_sum" tr mem [pm; pk1; pk2; pk3; pv]
             (fun tr' mem' rets =>
                tr = tr'
                /\ length rets = 1
@@ -150,7 +147,7 @@ Section examples.
              | _ => progress kv_hammer
              | |- WeakestPrecondition.call _ ?f _ ?m ?args _ =>
                (* call add -- need to borrow all args first *)
-               unify f (name_of_func add);
+               unify f "add";
                  let in0 := (eval hnf in (hd (word.of_Z 0) args)) in
                  let in1 := (eval hnf in (hd (word.of_Z 0) (tl args))) in
                  let in2 :=
@@ -172,8 +169,8 @@ Section examples.
             {ok : @kv_parameters_ok _ BW _ mem ops key value Value kvp}.
 
     Existing Instances map_ok annotated_map_ok key_eq_dec.
-    Local Hint Extern 1 (spec_of (let (x, _) := let (_, get, _) := ops in get in x)) => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
-    Local Hint Extern 1 (spec_of (let (x, _) := let (_, _, put) := ops in put in x)) => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "put") => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
 
     (* look up k1 and k2, add their values and store in k3 *)
     Definition swap_gallina (m : map.rep (map:=map))
@@ -184,19 +181,16 @@ Section examples.
       | _, _ => m
       end.
 
-    Definition swap : func :=
-      ("swap",
-       (["m"; "k1"; "k2"], [],
-        bedrock_func_body:(
-          unpack! err, v1 = $get (m, k1) ;
-            require !err ;
-            unpack! err, v2 = $get (m, k2) ;
-            require !err ;
-            unpack! err = $put (m, k2, v1)
-            (* now v2 is stored in v1 -- no need for second put *)
-      ))).
+    Definition swap := func! (m, k1, k2) {
+      unpack! err, v1 = get (m, k1) ;
+      require !err ;
+      unpack! err, v2 = get (m, k2) ;
+      require !err ;
+      unpack! err = put (m, k2, v1)
+      (* now v2 is stored in v1 -- no need for second put *)
+    }.
 
-    Instance spec_of_swap : spec_of swap :=
+    Instance spec_of_swap : spec_of "swap" :=
       fun functions =>
         forall pm m pk1 k1 pk2 k2 R tr mem,
           map.get m k1 <> None ->
@@ -204,7 +198,7 @@ Section examples.
           k1 <> k2 -> (* TODO: try removing *)
           (Map pm m * Key pk1 k1 * Key pk2 k2 * R)%sep mem ->
           WeakestPrecondition.call
-            functions swap tr mem [pm; pk1; pk2]
+            functions "swap" tr mem [pm; pk1; pk2]
             (fun tr' mem' rets =>
                tr = tr'
                /\ rets = []

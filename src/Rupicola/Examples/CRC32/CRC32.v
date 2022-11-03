@@ -88,4 +88,4 @@ End __.
 
 Require Import coqutil.Word.Naive.
 Definition crc32_cbytes := Eval vm_compute in
-  list_byte_of_string (ToCString.c_module [crc32_br2fn (word:=word64)]).
+  list_byte_of_string (ToCString.c_module [("crc32", crc32_br2fn (word:=word64))]).
