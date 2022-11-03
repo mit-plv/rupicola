@@ -122,4 +122,4 @@ Section Revcomp.
 End Revcomp.
 
 Definition revcomp_cbytes := Eval vm_compute in
-  list_byte_of_string (ToCString.c_module [revcomp_br2fn]).
+  list_byte_of_string (ToCString.c_module [("revcomp",revcomp_br2fn)]).

@@ -10,18 +10,10 @@ Import ListNotations.
 (* bedrock2 code *)
 Module Bedrock2.
   Axiom wordsize : Z. (* in bytes *)
-  Axiom toupper : func.
+  Axiom toupper : string.
   Definition charsize : Z := 1.
 
-  Definition capitalize_String : func :=
-    let s_ptr : string := "s_ptr" in
-    let ret : string := "ret" in
-    let len : string := "len" in
-    let i : string := "i" in
-    let x : string := "x" in
-    let c_ptr : string := "c_ptr" in
-    ("capitalize_String",
-     ([s_ptr], [ret], bedrock_func_body:(
+  Definition capitalize_String := func! (s_ptr) ~> ret {
        len = (load( s_ptr )) ;
        i = $0;
        c_ptr = (s_ptr + $wordsize) ;
@@ -31,15 +23,10 @@ Module Bedrock2.
          c_ptr = (c_ptr + $charsize) ;
          i = (i + $1)
        }} ;
-       ret = $1))).
+       ret = $1}.
 
-  Definition capitalize_3rd : func :=
-    let inp : string := "inp" in
-    let ret : string := "ret" in
-    let offset : Z := 2 * wordsize in
-    ("capitalize_3rd",
-     ([inp], [ret], bedrock_func_body:(
-       unpack! ret = capitalize_String(load( (inp + $offset) ))))).
+  Definition capitalize_3rd := func! (inp) ~> ret {
+      unpack! ret = capitalize_String(load( (inp + $(2*wordsize)) ))}.
 End Bedrock2.
 
 (* Gallina code *)

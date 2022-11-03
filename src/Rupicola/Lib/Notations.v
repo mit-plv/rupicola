@@ -1,3 +1,5 @@
+Require Export bedrock2.WeakestPrecondition.
+Require Export bedrock2.Syntax.
 Require Import Rupicola.Lib.Core.
 Require Import Rupicola.Lib.Monads.
 Require Import Rupicola.Lib.IdentParsing.
@@ -216,106 +218,6 @@ Notation "'liftexists' x .. y ',' P" :=
 Infix "⋆" := sep (at level 40, left associativity).
 Infix "&&&" := unsep (at level 50, left associativity). (* 50 binds less tightly than ⋆ *)
 
-Notation "'fnspec!' name a0 .. an '/' g0 .. gn '~>' r0 .. rn ',' '{' 'requires' tr mem := pre ';' 'ensures' tr' mem' ':=' post '}'" :=
-  (fun functions =>
-     (forall a0,
-        .. (forall an,
-              (forall g0,
-                  .. (forall gn,
-                         (forall tr mem,
-                             pre%Z ->
-                             WeakestPrecondition.call
-                               functions name tr mem (cons a0 .. (cons an nil) ..)
-                               (fun tr' mem' rets =>
-                                  (exists r0,
-                                      .. (exists rn,
-                                             rets = (cons r0 .. (cons rn nil) ..) /\
-                                             post%Z) ..)))) ..)) ..))
-    (at level 200,
-     name at level 0,
-     a0 binder, an binder,
-     g0 binder, gn binder,
-     r0 closed binder, rn closed binder,
-     tr name, tr' name, mem name, mem' name,
-     pre at level 200,
-     post at level 200).
-
-Notation "'fnspec!' name a0 .. an '/' g0 .. gn ',' '{' 'requires' tr mem := pre ';' 'ensures' tr' mem' ':=' post '}'" :=
-  (fun functions =>
-     (forall a0,
-        .. (forall an,
-              (forall g0,
-                  .. (forall gn,
-                         (forall tr mem,
-                             pre%Z%sep ->
-                             WeakestPrecondition.call
-                               functions name tr mem (cons a0 .. (cons an nil) ..)
-                               (fun tr' mem' rets =>
-                                  rets = nil /\ post%Z%sep))) ..)) ..))
-    (at level 200,
-     name at level 0,
-     a0 binder, an binder,
-     g0 binder, gn binder,
-     tr name, tr' name, mem name, mem' name,
-     pre at level 200,
-     post at level 200).
-
-Notation "'fnspec!' name a0 .. an '~>' r0 .. rn ',' '{' 'requires' tr mem := pre ';' 'ensures' tr' mem' ':=' post '}'" :=
-  (fun functions =>
-     (forall a0,
-        .. (forall an,
-               (forall tr mem,
-                   pre%Z ->
-                   WeakestPrecondition.call
-                     functions name tr mem (cons a0 .. (cons an nil) ..)
-                     (fun tr' mem' rets =>
-                        (exists r0,
-                            .. (exists rn,
-                                   rets = (cons r0 .. (cons rn nil) ..) /\
-                                   post%Z) ..)))) ..))
-    (at level 200,
-     name at level 0,
-     a0 binder, an binder,
-     r0 closed binder, rn closed binder,
-     tr name, tr' name, mem name, mem' name,
-     pre at level 200,
-     post at level 200).
-
-Notation "'fnspec!' name '~>' r0 .. rn ',' '{' 'requires' tr mem := pre ';' 'ensures' tr' mem' ':=' post '}'" :=
-  (fun functions =>
-     (forall tr mem,
-         pre%Z ->
-         WeakestPrecondition.call
-           functions name tr mem nil
-           (fun tr' mem' rets =>
-              (exists r0,
-                  .. (exists rn,
-                         rets = (cons r0 .. (cons rn nil) ..) /\
-                         post%Z) ..))))
-    (at level 200,
-     name at level 0,
-     r0 closed binder, rn closed binder,
-     tr name, tr' name, mem name, mem' name,
-     pre at level 200,
-     post at level 200).
-
-Notation "'fnspec!' name a0 .. an ',' '{' 'requires' tr mem := pre ';' 'ensures' tr' mem' ':=' post '}'" :=
-  (fun functions =>
-     (forall a0,
-        .. (forall an,
-               (forall tr mem,
-                   pre%Z%sep ->
-                   WeakestPrecondition.call
-                     functions name tr mem (cons a0 .. (cons an nil) ..)
-                     (fun tr' mem' rets =>
-                        rets = nil /\ post%Z%sep))) ..))
-    (at level 200,
-     name at level 0,
-     a0 binder, an binder,
-     tr name, tr' name, mem name, mem' name,
-     pre at level 200,
-     post at level 200).
-
 Notation "'fnspec!' name '/' g0 .. gn ',' '{' 'requires' tr mem := pre ';' 'ensures' tr' mem' rets ':=' post '}'" :=
   (fun functions =>
      (forall g0,
@@ -449,8 +351,8 @@ Notation "defn! spec" :=
                 _defn_impl := ?impl; _defn_gallina := ?gallina;
                 _defn_calls := ?calls |} =>
               let body := open_constr:(match _ return bedrock2.Syntax.cmd with c => c end) in
-              unify impl (name, (args, rets, body));
-              let goal := Rupicola.Lib.Tactics.program_logic_goal_for_function impl calls in
+              unify impl (args, rets, body);
+              let goal := Rupicola.Lib.Tactics.program_logic_goal_for_function name impl calls in
               exact (Rupicola.Lib.Core.__rupicola_program_marker gallina -> goal)
            end)
    end)

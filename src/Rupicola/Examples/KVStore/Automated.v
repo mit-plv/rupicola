@@ -35,8 +35,7 @@ Section KVSwap.
 
   Existing Instances ops kvp ok.
   Existing Instances map_ok annotated_map_ok key_eq_dec.
-  Existing Instances spec_of_map_get.
-  Local Hint Extern 1 (spec_of (fst get)) => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances. (* COQBUG(14707) *)
+  Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances. (* COQBUG(14707) *)
 
   (* MAP LAYOUTS
 
@@ -159,13 +158,13 @@ Section KVSwap.
    *)
   Import KVStore.
 
-  Instance spec_of_map_put : spec_of put :=
+  Instance spec_of_map_put : spec_of "put" :=
     fun functions =>
       forall pm m pk k pv v R tr mem,
         (AnnotatedMap pm m
          * Key pk k * Value pv v * R)%sep mem ->
         WeakestPrecondition.call
-          functions put tr mem [pm; pk; pv]
+          functions "put" tr mem [pm; pk; pv]
           (fun tr' mem' rets =>
              tr = tr'
              /\ length rets = 0%nat
@@ -293,7 +292,7 @@ Section KVSwap.
          Locals := locals;
          Functions := functions }>
       cmd.seq
-        (cmd.call [err; var] (fst (@KVStore.get ops)) [m_expr; k_expr])
+        (cmd.call [err; var] "get" [m_expr; k_expr])
         (cmd.cond (expr.op bopname.eq (expr.var err) (expr.literal 0))
                   K_impl
                   default_impl)
@@ -306,6 +305,10 @@ Section KVSwap.
     { cbn.
       eapply WeakestPrecondition_dexpr_expr; eauto.
       eapply WeakestPrecondition_dexpr_expr; eauto. }
+    match goal with
+   | |- call _ ?f _ _ _ _ =>
+         unify f "get"; handle_call; autorewrite with mapsimpl in *
+    end.
     kv_hammer.
     destruct_one_match_hyp_of_type (option (annotation * value)).
     { destruct_products.
@@ -437,9 +440,7 @@ Section KVSwap.
          Locals := locals;
          Functions := functions }>
       cmd.seq
-        (cmd.call []
-                  (fst (@KVStore.put ops))
-                  [m_expr; k_expr; v_expr])
+        (cmd.call [] "put" [m_expr; k_expr; v_expr])
         K_impl
       <{ pred (dlet m K) }>.
   Proof.

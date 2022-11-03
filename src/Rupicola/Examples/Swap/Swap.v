@@ -7,15 +7,9 @@ Require bedrock2.WeakestPrecondition.
 Local Open Scope Z_scope. Local Open Scope string_scope.
 Import ListNotations.
 
-(* bedrock2 code *)
 Module Bedrock2.
-  Definition swap : func :=
-    let a : string := "a" in
-    let b : string := "b" in
-    let tmp : string := "tmp" in
-    ("swap",
-     ([a; b], [], bedrock_func_body:(
+  Definition swap := func! (a, b) {
        tmp = ( load( a ) ) ;
        store( a, load( b ) );
-       store( b, tmp )))).
+       store( b, tmp )}.
 End Bedrock2.

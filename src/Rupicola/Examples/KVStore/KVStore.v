@@ -89,7 +89,7 @@ Section KVStore.
     Context {ops key value Value}
             {kvp : @kv_parameters ops key value Value}.
 
-    Instance spec_of_map_init : spec_of map_init :=
+    Instance spec_of_map_init : spec_of "map_init" :=
       fun functions =>
         forall p start R tr mem,
           (* { p -> start } *)
@@ -102,7 +102,7 @@ Section KVStore.
                       (array ptsto (word.of_Z 1) start xs))
            * R)%sep mem ->
           WeakestPrecondition.call
-            functions map_init tr mem [p]
+            functions "map_init" tr mem [p]
             (fun tr' mem' rets =>
                tr = tr'
                /\ rets = []
@@ -110,12 +110,12 @@ Section KVStore.
 
     (* get returns a pair; a boolean (true if there was an error) and a value,
        which is meaningless if there was an error. *)
-    Instance spec_of_map_get : spec_of get :=
+    Instance spec_of_map_get : spec_of "get" :=
       fun functions =>
         forall pm m pk k R tr mem,
           sep (sep (AnnotatedMap pm m) (Key pk k)) R mem ->
           WeakestPrecondition.call
-            functions get tr mem [pm; pk]
+            functions "get" tr mem [pm; pk]
             (fun tr' mem' rets =>
                tr = tr'
                /\ length rets = 2%nat
@@ -144,13 +144,13 @@ Section KVStore.
     (* put returns a boolean indicating whether the key was already
        present. If true, the original value pointer now points to the old
        value. *)
-    Instance spec_of_map_put : spec_of put :=
+    Instance spec_of_map_put : spec_of "put" :=
       fun functions =>
         forall pm m pk k pv v R tr mem,
           (AnnotatedMap pm m
            * Key pk k * Value pv v * R)%sep mem ->
           WeakestPrecondition.call
-            functions put tr mem [pm; pk; pv]
+            functions "put" tr mem [pm; pk; pv]
             (fun tr' mem' rets =>
                tr = tr'
                /\ length rets = 1%nat

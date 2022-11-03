@@ -151,11 +151,11 @@ Ltac kv_hammer :=
          | H : _ |- _ => rewrite map.get_put_dec in H
          | |- WeakestPrecondition.call _ ?f _ _ _ _ =>
            (* call get *)
-           unify f (fst get);
+           unify f "get";
            handle_call; autorewrite with mapsimpl in *
          | |- WeakestPrecondition.call _ ?f _ ?m ?args _ =>
            (* call put -- unborrow everything except value being placed *)
-           unify f (fst put);
+           unify f "put";
            let pv :=
                (eval hnf in (hd (word.of_Z 0) (tl (tl args)))) in
            try unborrow_all; try borrow pv;
