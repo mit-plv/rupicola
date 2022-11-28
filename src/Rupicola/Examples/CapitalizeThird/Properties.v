@@ -430,10 +430,8 @@ Section Proofs.
                              rewrite word.of_Z_unsigned in H end.
       let H :=
           match goal with
-            H : word.ltu _ (word.of_Z (Z.of_nat (len _))) = true |- _ =>
+            H : word.unsigned _ < word.unsigned (word.of_Z (Z.of_nat (len _))) |- _ =>
             H end in
-      rewrite word.unsigned_ltu in H;
-        apply Z.ltb_lt in H;
         rewrite word.unsigned_of_Z in H;
         cbv [word.wrap] in H;
         rewrite Z.mod_small in H by lia;
@@ -648,10 +646,8 @@ Section Proofs.
                              rewrite word.of_Z_unsigned in H end.
       let H :=
           match goal with
-            H : word.ltu _ (word.of_Z (Z.of_nat (len _))) = false |- _ =>
+            H : word.unsigned (word.of_Z (Z.of_nat (len _))) <= _ |- _ =>
             H end in
-      rewrite word.unsigned_ltu in H;
-        apply Z.ltb_ge in H;
         rewrite word.unsigned_of_Z in H;
         cbv [word.wrap] in H;
         rewrite Z.mod_small in H by lia;
