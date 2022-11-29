@@ -1339,35 +1339,6 @@ Section Nat2Z.
       split; reflexivity.
   Qed.
 
-  (* FIXME: already exists as div_Zdiv, mod_Zmod *)
-  Lemma Nat2Z_inj_div_mod a b:
-    Z.of_nat (a / b) = Z.of_nat a / Z.of_nat b /\
-    Z.of_nat (a mod b) = Z.of_nat a mod Z.of_nat b.
-  Proof.
-    destruct (Nat.eq_dec b 0) as [->|].
-    - destruct a; split; reflexivity.
-    - pose (q := (a / b)%nat).
-      pose (r := (a mod b)%nat).
-      assert (a = b * q + r)%nat as Hnat by (apply Nat_mod_eq'; lia).
-      pose (zq := Z.of_nat a / Z.of_nat b).
-      pose (zr := Z.of_nat a mod Z.of_nat b).
-      assert (Z.of_nat a = Z.of_nat b * zq + zr) as Hz by (apply Z_mod_eq'; lia).
-      apply (f_equal Z.of_nat) in Hnat.
-      rewrite Nat2Z.inj_add, Nat2Z.inj_mul in Hnat.
-      pose proof Nat.mod_bound_pos a b ltac:(lia) ltac:(lia).
-      pose proof Z.mod_bound_or (Z.of_nat a) (Z.of_nat b).
-      eapply Z_div_eucl_unique; try eassumption.
-      all: try lia.
-  Qed.
-
-  Lemma Nat2Z_inj_div a b:
-    Z.of_nat (a / b) = Z.of_nat a / Z.of_nat b.
-  Proof. apply (Nat2Z_inj_div_mod a b). Qed.
-
-  Lemma Nat2Z_inj_mod a b:
-    Z.of_nat (a mod b) = Z.of_nat a mod Z.of_nat b.
-  Proof. apply (Nat2Z_inj_div_mod a b). Qed.
-
   Lemma Nat2Z_inj_odd : forall n,
     Z.odd (Z.of_nat n) = Nat.odd n.
   Proof.
@@ -1398,6 +1369,11 @@ Section Nat2Z.
     destruct Nat.odd; reflexivity.
   Qed.
 End Nat2Z.
+
+#[deprecated(note = "Use Nat2Z.inj_div instead.")]
+Notation Nat2Z_inj_div := Nat2Z.inj_div.
+#[deprecated(note = "Use Nat2Z.inj_mod instead.")]
+Notation Nat2Z_inj_mod := Nat2Z.inj_mod.
 
 Section Rupicola.
   Definition __rupicola_program_marker {A} (a: A) := True.

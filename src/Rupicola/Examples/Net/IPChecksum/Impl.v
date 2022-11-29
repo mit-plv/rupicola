@@ -81,14 +81,14 @@ Section Properties.
     rewrite <- !fold_left_as_nd_ranged_for_all.
     rewrite (z_range_app 0 (Z.of_nat (n / 2)) (_ + _)) by lia.
     rewrite fold_left_app.
-    rewrite Nat2Z_inj_div.
+    rewrite Nat2Z.inj_div.
     set (fold_left _ (z_range 0 _) _) as prefix.
     rewrite z_range_add, Nat2Z.id.
     rewrite Nat2Z_inj_odd, Natodd_mod.
     destruct (nat_div2_spec n) as [(Heq, ->) | (Heq, ->)];
       cbn [Nat.eqb negb z_range' List.fold_left].
     - reflexivity.
-    - rewrite <- Nat2Z_inj_div.
+    - rewrite <- Nat2Z.inj_div.
       f_equal.
       + f_equal; lia.
       + unfold ListArray.get, cast, Convertible_Z_nat; rewrite nth_overflow by lia;

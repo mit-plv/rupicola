@@ -251,7 +251,7 @@ Instead of applying the mask byte by byte, the program starts by casting its inp
     Hint Extern 1 => simple eapply compile_bs2ws_rev; shelve : compiler.
     Hint Extern 1 => (pose proof bytes_per_range access_size.word) : nia.
     Hint Rewrite @bs2ws_length using solve[eauto with nia] : compiler_side_conditions.
-    Hint Rewrite Nat2Z_inj_div : compiler_side_conditions.
+    Hint Rewrite Nat2Z.inj_div : compiler_side_conditions.
     Hint Extern 10 => eauto with nia : compiler_side_conditions.
 
     Derive count_ws_br2fn SuchThat
