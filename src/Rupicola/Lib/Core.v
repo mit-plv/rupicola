@@ -6,7 +6,7 @@ From bedrock2 Require Export
      Map.SeparationLogic Scalars Syntax WeakestPreconditionProperties
      ZnWords.
 From coqutil Require Export
-     Macros.WithBaseName dlet Byte List
+     Macros.WithBaseName dlet Byte Datatypes.List
      Z.PushPullMod Tactics.Tactics Tactics.letexists
      Word.Interface Word.Properties Word.Bitwidth
      Map.Interface Map.Properties Map.SortedList.
