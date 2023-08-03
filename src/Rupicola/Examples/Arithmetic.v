@@ -6,11 +6,9 @@ From bedrock2 Require BasicC32Semantics BasicC64Semantics.
 Module Type FNV1A_params.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {wordok : word.ok word} {mapok : map.ok mem}.
   Context {localsok : map.ok locals}.
-  Context {envok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Parameter prime : word.
   Parameter offset : word.
@@ -18,7 +16,7 @@ End FNV1A_params.
 
 Module FNV1A (Import P: FNV1A_params).
 #[global]
-  Existing Instances BW word locals mem env ext_spec wordok mapok localsok envok ext_spec_ok.
+  Existing Instances BW word locals mem ext_spec wordok mapok localsok ext_spec_ok.
   Import SizedListArrayCompiler.
 
   Definition update (hash data : word) :=

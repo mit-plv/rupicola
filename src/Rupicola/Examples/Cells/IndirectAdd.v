@@ -5,11 +5,9 @@ Require Import Rupicola.Examples.Cells.Cells.
 Section with_parameters.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {wordok : word.ok word} {mapok : map.ok mem}.
   Context {localsok : map.ok locals}.
-  Context {envok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Local Notation cell := (@cell width BW word).
 

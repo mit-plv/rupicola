@@ -197,7 +197,7 @@ Notation "[[ locals ]]" := {| value := locals; _value_ok := _ |} (only printing)
 
 Notation "<{ 'Trace' := tr ; 'Memory' := mem ; 'Locals' := locals ; 'Functions' := functions }> cmd <{ post }>" :=
   (WeakestPrecondition.cmd
-     (WeakestPrecondition.call functions)
+     functions
      cmd tr mem locals post)
     (at level 0,
      format "'[hv' <{  '[' '[' 'Trace'  :=  tr ']' ;  '/' '[' 'Memory'  :=  mem ']' ;  '/' '[' 'Locals'  :=  locals ']' ;  '/' '[' 'Functions'  :=  functions ']' ']'  }>  '/  ' cmd  '/' <{  '[' post ']'  }> ']'").

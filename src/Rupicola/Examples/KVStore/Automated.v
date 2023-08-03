@@ -22,11 +22,9 @@ Notation "'let/o'  x  :=  val  'goto_fail' default 'in'  body" :=
 Section KVSwap.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Context {ops} {key value : Type} {Value}
           {dummy_value : value}
@@ -496,8 +494,8 @@ Section KVSwap.
 
   Instance spec_of_kvswap : spec_of "kvswap" :=
     fun functions =>
-      spec_of_map_get (List.tl functions) -> (* FIXME *)
-      spec_of_map_put (List.tl functions) -> (* FIXME *)
+      spec_of_map_get functions -> (* FIXME *)
+      spec_of_map_put functions -> (* FIXME *)
       forall pm m pk1 k1 pk2 k2 R tr mem,
         k1 <> k2 -> (* TODO: try removing *)
         (Map pm m * Key pk1 k1 * Key pk2 k2 * R)%sep mem ->

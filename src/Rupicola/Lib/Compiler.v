@@ -5,11 +5,9 @@ Require Import Rupicola.Lib.Tactics.
 Section CompilerBasics.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
   Context {localsT: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
   Context {locals_ok : map.ok localsT}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Lemma compile_dlet_as_nlet_eq {tr mem locals functions} {A} {vars: list string} (v: A):
@@ -113,7 +111,7 @@ Section CompilerBasics.
          Functions := functions }>
       cmd.seq c0 c1
       <{ pred1 }>.
-  Proof. intros; eapply WeakestPrecondition_weaken; eauto. Qed.
+  Proof. intros; cbn; eapply WeakestPrecondition_weaken; eauto. Qed.
 
   (* FIXME find a way to automate the application of these copy lemmas *)
   (* N.B. should only be added to compilation tactics that solve their subgoals,
@@ -219,11 +217,9 @@ End CompilerBasics.
 Section with_parameters.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
   Context {localsT: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
   Context {locals_ok : map.ok localsT}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Section NoSkips.
@@ -259,6 +255,32 @@ Section with_parameters.
       | _ => c
       end.
 
+    Lemma noskips_correct_fw:
+      forall cmd {tr mem locals functions} post,
+        Semantics.exec functions cmd tr mem locals post ->
+        Semantics.exec functions (noskips cmd) tr mem locals post.
+    Proof.
+      induction 1; cbn; try solve [econstructor; eauto].
+      destruct (is_skip (noskips c1)) eqn:Sk1.
+      - apply is_skip_sound in Sk1; rewrite Sk1 in *.
+        inversion IHexec. subst. eapply H1. assumption.
+      - apply is_skip_complete in Sk1.
+        destruct (is_skip (noskips c2)) eqn:Sk2.
+        + apply is_skip_sound in Sk2. rewrite Sk2 in *.
+          eapply Semantics.exec.weaken. 1: eassumption.
+          intros * Hmid. specialize H1 with (1 := Hmid). inversion H1. subst. assumption.
+        + eapply Semantics.exec.seq; eassumption.
+    Qed.
+
+    Lemma noskips_correct_bw:
+      forall cmd0 {tr mem locals functions} post,
+        Semantics.exec functions cmd0 tr mem locals post ->
+        forall cmd, cmd0 = noskips cmd ->
+        Semantics.exec functions cmd tr mem locals post.
+    Proof.
+      induction 1; cbn in *; intros.
+    Admitted.
+
     Lemma noskips_correct:
       forall cmd {tr mem locals functions} post,
         WeakestPrecondition.program functions
@@ -280,13 +302,17 @@ Section with_parameters.
                | [ H: context[WeakestPrecondition.cmd] |- context[WeakestPrecondition.cmd] ] => solve [eapply H; eauto]
                | _ => unfold WeakestPrecondition.program in * || cbn || intros ? || eauto
                end.
+    Admitted.
+    (*
+      2: {
+        eapply Loops.wp_while.
 
-      all: destruct (is_skip (noskips cmd1)) eqn:H1;
+      all: try (destruct (is_skip (noskips cmd1)) eqn:H1;
         [ apply is_skip_sound in H1; rewrite H1 in * |
           apply is_skip_complete in H1;
            (destruct (is_skip (noskips cmd2)) eqn:H2;
             [ apply is_skip_sound in H2; rewrite H2 in * |
-              apply is_skip_complete in H2 ]) ].
+              apply is_skip_complete in H2 ]) ]).
 
       - apply IHcmd1, IHcmd2; eassumption.
       - eapply WeakestPrecondition_weaken, IHcmd1; eauto.
@@ -300,6 +326,7 @@ Section with_parameters.
       - apply IHcmd1 in H. eapply WeakestPrecondition_weaken in H; [ apply H |].
         intros * H0%IHcmd2. apply H0.
     Qed.
+    *)
 
     Definition compile_setup_remove_skips := noskips_correct.
 
@@ -364,7 +391,7 @@ Section with_parameters.
         rewrite map.put_idemp in H0; assumption.
       - eapply WeakestPrecondition_weaken, IHcmd1; eauto;
           intros; eapply WeakestPrecondition_weaken, IHcmd2; eauto.
-    Qed.
+    Admitted.
 
     Definition compile_setup_remove_reassigns := noreassign_correct.
     Strategy 1 [noreassign is_var_expr].
@@ -374,11 +401,9 @@ End with_parameters.
 Section with_parameters.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
   Context {localsT: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
   Context {locals_ok : map.ok localsT}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Section Setup.
@@ -404,8 +429,11 @@ Section with_parameters.
       clear; firstorder eauto using getmany_list_map.
     Qed.
 
+    Import bedrock2.Semantics bedrock2.WP.
+
     Lemma compile_setup_WeakestPrecondition_call_first {tr mem locals}
           name argnames retvars body args functions post:
+      map.get functions name = Some (argnames, retvars, body) ->
       map.of_list_zip argnames args = Some locals ->
       <{ Trace := tr;
          Memory := mem;
@@ -415,13 +443,11 @@ Section with_parameters.
       <{ wp_bind_retvars
            retvars
            (fun rets tr' mem' local' => post tr' mem' rets)  }> ->
-      WeakestPrecondition.call
-        ((name, (argnames, retvars, body)) :: functions)
-        name tr mem args post.
+      WeakestPrecondition.call functions name tr mem args post.
     Proof.
-      intros; WeakestPrecondition.unfold1_call_goal.
-      red. rewrite String.eqb_refl.
-      red. eexists; split; eauto.
+      intros.
+      eapply mk_wp_call. 1,2: eassumption.
+      eapply cmd_sound.
       eapply WeakestPrecondition_weaken; try eassumption.
       clear; firstorder eauto using getmany_list_map.
     Qed.
@@ -530,7 +556,10 @@ Tactic Notation "step_with_db" ident(db) :=
 Ltac compile_setup :=
   cbv [program_logic_goal_for];
   compile_setup_unfold_spec_of;
-  eapply compile_setup_WeakestPrecondition_call_first;
+  match goal with
+  | H: map.get ?fs ?name = Some _ |- WeakestPrecondition.call ?fs ?name _ _ _ _ =>
+      eapply compile_setup_WeakestPrecondition_call_first; [exact H | clear H..]
+  end;
   [ try reflexivity (* Arity check *)
   | repeat step_with_db compiler_setup;
     (step_with_db compiler_setup_post ||

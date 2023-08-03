@@ -11,7 +11,6 @@ Section ExprCompiler.
   Context {word: word.word width} {word_ok : word.ok word}.
   Context {mem: map.map word Byte.byte} {mem_ok : map.ok mem}.
   Context {locals: map.map String.string word} {locals_ok : map.ok locals}.
-  Context {env: map.map string (list string * list string * cmd)}.
 
   Section WordLemmas.
     Lemma word_not_xor (w: word):
@@ -571,7 +570,6 @@ Section Tests.
   Context {mem: map.map word Byte.byte} {locals: map.map String.string word}.
   Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
-  Context {env: map.map string (list string * list string * cmd)}.
 
   Context (m: mem).
 

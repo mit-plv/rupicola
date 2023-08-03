@@ -216,10 +216,9 @@ Ltac program_logic_goal_for_function fname proc callees :=
   (* We do not evaluate callees since in this version they are typically already a value
      and it adds a noticeable performance overhead at declaration and Qed. *)
   let spec := lazymatch constr:(_:spec_of fname) with ?s => s end in
-  constr:(forall functions : list (string * func),
-             ltac:(let s := assuming_correctness_of_in
-                              callees functions
-                              (spec (cons (fname, proc) functions)) in
+  constr:(forall (functions : @map.rep _ _ Semantics.env)
+                 (EnvContains : map.get functions fname = Some proc),
+             ltac:(let s := assuming_correctness_of_in callees functions (spec functions) in
                    exact s)).
 
 Ltac use_hyp_with_matching_cmd :=
@@ -227,8 +226,7 @@ Ltac use_hyp_with_matching_cmd :=
            | H: context [WeakestPrecondition.cmd _ ?impl]
              |- WeakestPrecondition.cmd _ ?impl _ _ _ _ => H end in
   eapply Proper_cmd;
-  [ solve [apply Proper_call]
-  | repeat intro | eapply H ].
+  [ repeat intro | eapply H ].
 
 Ltac push_map_remove :=
   repeat first [ rewrite map.remove_put_diff by congruence

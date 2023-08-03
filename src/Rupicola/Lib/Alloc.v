@@ -4,11 +4,9 @@ Require Import Rupicola.Lib.Notations.
 Section with_parameters.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   (* To enable allocation of A terms via the predicate P, implement this class *)
@@ -63,7 +61,7 @@ Section with_parameters.
     (R * (fun mem => pred v tr' mem locals'))%sep mem'.
 
   (* identity used as a marker to indicate when something should be allocated *)
-  Definition stack {A} (a : A) := a. 
+  Definition stack {A} (a : A) := a.
 
   Lemma compile_stack {tr m l functions A} (v : A):
     forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
@@ -106,7 +104,7 @@ Arguments stack : simpl never.
 Arguments size_in_bytes : simpl never.
 
 (*TODO: speed up by combining pred_seps first and using 1 proper/ecancel_assumption?*)
-Ltac clear_pred_seps :=   
+Ltac clear_pred_seps :=
   unfold pred_sep;
   repeat change (fun x => ?h x) with h;
   repeat match goal with
@@ -116,7 +114,7 @@ Ltac clear_pred_seps :=
          end.
 
 (* FIXME I don't think eassumption is needed, and there might actually be multiple ?R m *)
-(* must be applied before compile_simple_alloc 
+(* must be applied before compile_simple_alloc
    TODO: understand why
  *)
 #[export] Hint Extern 10 =>
