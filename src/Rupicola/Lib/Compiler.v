@@ -1,6 +1,7 @@
 Require Import Rupicola.Lib.Core.
 Require Import Rupicola.Lib.Notations.
 Require Import Rupicola.Lib.Tactics.
+Require Import coqutil.Tactics.fwd.
 
 Section CompilerBasics.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
@@ -272,13 +273,41 @@ Section with_parameters.
         + eapply Semantics.exec.seq; eassumption.
     Qed.
 
+    Definition refinement(c1 c2: cmd) := forall functions t m l post,
+        Semantics.exec.exec functions c1 t m l post ->
+        Semantics.exec.exec functions c2 t m l post.
+
+    Lemma use_refinement_while: forall functions test body1 body2,
+        refinement body1 body2 ->
+        forall t m l post,
+        Semantics.exec.exec functions (cmd.while test body1) t m l post ->
+        Semantics.exec.exec functions (cmd.while test body2) t m l post.
+    Proof.
+      intros * R *. remember (cmd.while test body1) as c1. intros. revert Heqc1.
+      induction H; intros; subst; inversion Heqc1; subst.
+      - eapply Semantics.exec.while_false; eassumption.
+      - eapply Semantics.exec.while_true; try eassumption.
+        { unfold refinement in R.
+          eapply R. eassumption. }
+        intros.
+        eapply H3; eauto.
+    Qed.
+
     Lemma noskips_correct_bw:
-      forall cmd0 {tr mem locals functions} post,
-        Semantics.exec functions cmd0 tr mem locals post ->
-        forall cmd, cmd0 = noskips cmd ->
+      forall cmd {tr mem locals functions} post,
+        Semantics.exec functions (noskips cmd) tr mem locals post ->
         Semantics.exec functions cmd tr mem locals post.
     Proof.
-      induction 1; cbn in *; intros.
+      induction cmd; cbn in *; intros;
+        repeat match goal with
+          | H: _ = noskips _ |- _ => discriminate H
+          end;
+        cbn in *;
+        fwd;
+        try solve [econstructor; eauto].
+      8: {
+        eapply use_refinement_while. 2: exact H.
+        unfold refinement. intros *. eapply IHcmd. }
     Admitted.
 
     Lemma noskips_correct:
