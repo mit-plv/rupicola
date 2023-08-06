@@ -3,7 +3,6 @@ Require Import Rupicola.Lib.Api.
 Section Tree.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Notation address := word.
 
@@ -134,7 +133,6 @@ Section Tree.
       Context
         {word_ok : word.ok word} {mem_ok : map.ok mem}
         {locals_ok : map.ok locals}
-        {env_ok : map.ok env}
         {ext_spec_ok : Semantics.ext_spec.ok ext_spec}
         {Alpha : word -> alpha -> mem -> Prop}
         {word_size_in_bytes : Z}.

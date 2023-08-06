@@ -1323,12 +1323,10 @@ Section with_parameters.
   Qed.
 
   Context {BW: Bitwidth width}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {mem: map.map word Byte.byte}.
   Context {mem_ok : map.ok mem}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {locals_ok : map.ok locals}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Ltac _split_conj :=
@@ -1423,6 +1421,7 @@ Section with_parameters.
         unfold cmd_loop.
       repeat straightline.
       _split_conj.
+      eapply Loops.wp_while.
 
       destruct (Z_gt_le_dec from to).
       { (* Loop won't run at all *)
@@ -1449,8 +1448,6 @@ Section with_parameters.
                        let a := ranged_for' from from' (wbody body pr Hr) a0 in
                        (from' < to -> ExitToken.get (fst a) = false) /\
                        loop_pred from' (snd a) tr mem locals)).
-
-      red. red.
 
       eexists nat, lt, inv; split.
       { apply lt_wf. }
@@ -2123,7 +2120,7 @@ Section with_parameters.
   Section ranged_for_words.
     Context {A: Type}
             {tr : Semantics.trace} {m : mem} {l : locals}
-            {functions : list (string * (list string * list string * cmd))}
+            {functions : Semantics.env}
             (from to : word).
 
     Definition compile_ranged_for_u :=

@@ -64,11 +64,9 @@ Definition cmd_downto_fresh i_var i_expr step_impl k_impl :=
 Section Compilation.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Implicit Types (x : word).
 
@@ -156,6 +154,7 @@ Section Compilation.
 
     (* handle while *)
     WeakestPrecondition.unfold1_cmd_goal; (cbv beta match delta [WeakestPrecondition.cmd_body]).
+    eapply Loops.wp_while.
 
     exists nat, lt.
     exists (fun i t m l =>
@@ -365,11 +364,9 @@ End DownToCompiler.
 Section GhostCompilation.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Implicit Types (x : word).
 
@@ -457,6 +454,7 @@ Section GhostCompilation.
     (* handle while *)
     WeakestPrecondition.unfold1_cmd_goal;
       (cbv beta match delta [WeakestPrecondition.cmd_body]).
+    eapply Loops.wp_while.
     exists nat, lt.
     exists (fun i t m l =>
               let stgst :=

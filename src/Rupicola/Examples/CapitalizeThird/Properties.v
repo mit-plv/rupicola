@@ -15,7 +15,7 @@ Require Import coqutil.Map.Interface coqutil.Map.Properties.
 Require Import coqutil.Z.PushPullMod.
 Require Import coqutil.Tactics.Tactics.
 Require Import Rupicola.Examples.CapitalizeThird.CapitalizeThird.
-Require bedrock2.WeakestPrecondition.
+Require bedrock2.WeakestPrecondition bedrock2.Loops.
 Require bedrock2.Semantics.
 Require Import bedrock2.BasicC64Semantics.
 From coqutil.Tactics Require Import destr.
@@ -174,7 +174,7 @@ Ltac listsimplify :=
          end.
 
 Section Proofs.
-  Context (functions' : list (string * func))
+  Context (functions' : Semantics.env)
           (toupper_body : Byte.byte -> Byte.byte).
 
   Local Definition byte_to_word : Byte.byte -> word :=
@@ -303,11 +303,11 @@ Section Proofs.
     forall tr mem R,
       sep (String addr s) R mem ->
       len s = length (chars s) ->
-      let functions := (("capitalize_String",capitalize_String) :: functions') in
+      map.get functions' "capitalize_String" = Some capitalize_String ->
       let caps :=
           Gallina.capitalize_String (toupper:=toupper_body) s in
       WeakestPrecondition.call
-        functions "capitalize_String" tr mem [addr]
+        functions' "capitalize_String" tr mem [addr]
         (fun tr' mem' rets =>
            let success := word.unsigned (hd (word.of_Z 0) rets) in
            tr = tr' /\
@@ -318,18 +318,8 @@ Section Proofs.
              (success = 1 /\ sep (String addr caps) R mem'))).
   Proof.
     cbv zeta. intros.
-
-    (* finding the function to call *)
-    cbn [WeakestPrecondition.call
-           WeakestPrecondition.call_body
-           capitalize_String fst].
-    match goal with |- if String.eqb ?x ?x then _ else _ =>
-                    destr (String.eqb x x) end;
-      [ | congruence ].
-
-    (* load arguments as initial local variables *)
-    cbn [WeakestPrecondition.func].
-    eexists; split; [ reflexivity | ].
+    do 4 eexists. 1: eassumption. do 2 eexists. 1: reflexivity.
+    eapply sound_cmd.
 
     (* beginning of function body *)
     cbn [WeakestPrecondition.cmd WeakestPrecondition.cmd_body].
@@ -358,7 +348,8 @@ Section Proofs.
     cbn [WeakestPrecondition.cmd WeakestPrecondition.cmd_body].
     match goal with |- dlet.dlet ?locals _ =>
                     cbv [dlet.dlet];
-                      exists nat, lt, (loop_invariant s tr locals addr R)
+                    eapply Loops.wp_while;
+                    exists nat, lt, (loop_invariant s tr locals addr R)
     end.
     split; [ exact lt_wf | ].
     cbv [loop_invariant]; split.
@@ -664,7 +655,9 @@ Section Proofs.
 
       (* ret = 1 *)
       eexists; split; [ solve [constructor] | ].
-      eexists; split; [ rewrite map.get_put_same; reflexivity | ].
+      eexists; split.
+      { cbn [map.getmany_of_list List.option_all List.map].
+        rewrite map.get_put_same; reflexivity. }
       cbn [WeakestPrecondition.list_map WeakestPrecondition.list_map_body].
 
       (* take care of easy postconditions *)
@@ -706,12 +699,12 @@ Section Proofs.
       Forall (fun s => len s = length (chars s)) strings ->
       (* there are at least 3 strings *)
       (3 <= length strings)%nat ->
-      let functions :=
-          (pair "capitalize_3rd" capitalize_3rd :: pair "capitalize_String" capitalize_String :: functions') in
+      map.get functions' "capitalize_3rd" = Some capitalize_3rd ->
+      map.get functions' "capitalize_String" = Some capitalize_String ->
       let caps :=
           Gallina.capitalize_3rd (toupper:=toupper_body) strings in
       WeakestPrecondition.call
-        functions "capitalize_3rd" tr mem [inp]
+        functions' "capitalize_3rd" tr mem [inp]
         (fun tr' mem' rets =>
            let success := word.unsigned (hd (word.of_Z 0) rets) in
            tr = tr' /\
@@ -726,18 +719,8 @@ Section Proofs.
                   R mem'))).
   Proof.
     cbv zeta. intros.
-
-    (* finding the function to call *)
-    cbn [WeakestPrecondition.call].
-    cbn [WeakestPrecondition.call_body
-           capitalize_3rd fst].
-    match goal with |- if String.eqb ?x ?x then _ else _ =>
-                    destr (String.eqb x x) end;
-      [ | congruence ].
-
-    (* load arguments as initial local variables *)
-    cbn [WeakestPrecondition.func].
-    eexists; split; [ reflexivity | ].
+    do 4 eexists. 1: eassumption. do 2 eexists. 1: reflexivity.
+    eapply sound_cmd.
 
     (* beginning of function body *)
     cbn [WeakestPrecondition.cmd WeakestPrecondition.cmd_body].
@@ -783,6 +766,7 @@ Section Proofs.
     eapply Proper_call.
     2:{
       apply capitalize_String_correct.
+      3: eassumption.
       { (* identify string that matches argument *)
         match goal with
           H : sep _ _ _ |- _ =>
@@ -811,9 +795,9 @@ Section Proofs.
           destruct x as [|? x]; [|cbn [length] in H; congruence]
     end.
     eexists; split; [ reflexivity | ].
-    eexists; split;
-      [ rewrite ?map.get_put_diff, map.get_put_same by congruence;
-        reflexivity | ].
+    eexists; split.
+    { cbn [map.getmany_of_list List.option_all List.map].
+      rewrite map.get_put_same; reflexivity. }
 
     (* prove postcondition *)
     repeat (split; [ reflexivity | ]).

@@ -8,14 +8,12 @@ Require Import Rupicola.Examples.Cells.Cells.
 Section __.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {wordok : word.ok word} {mapok : map.ok mem}.
   Context {localsok : map.ok locals}.
-  Context {envok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Section Gallina.
-    
+
     Definition all_1s : word := word.of_Z (-1).
 
     Definition is_mask mask : Prop :=
@@ -23,7 +21,7 @@ Section __.
 
     Definition mask_of_bool (b : bool) :=
       if b then all_1s else word.of_Z 0.
-      
+
     (*idea: if b then true_val else false_val *)
     Definition select_word (mask : word) true_val false_val :=
       let/n nmask := (word.sub (word.of_Z (-1)) mask) in
@@ -49,11 +47,11 @@ Section __.
       let/n c2 := put r in
       (c1,c2).
 
-    
+
     Instance HasDefault_word : HasDefault word :=
       word.of_Z 0.
 
-    Definition cmove_array mask len 
+    Definition cmove_array mask len
                (a1: ListArray.t word.rep)
                (a2: ListArray.t word.rep) :=
       let/n from := word.of_Z 0 in
@@ -91,14 +89,14 @@ Section __.
       (a1, a2).
   End Gallina.
 
-  
+
   Lemma z_lt_width : 0 <= width.
   Proof.
     destruct width_cases; lia.
   Qed.
-  
 
-  
+
+
   Lemma all_1s_and : forall x, word.and all_1s x = x.
   Proof.
     intros.
@@ -119,7 +117,7 @@ Section __.
   Proof.
     rewrite <- (word.of_Z_signed (word.not all_1s)).
     rewrite word.signed_not.
-    unfold all_1s.    
+    unfold all_1s.
     rewrite word.signed_of_Z.
     rewrite !word.swrap_inrange.
     change (-1) with (-(1)).
@@ -132,7 +130,7 @@ Section __.
       destruct width_cases as [H|H]; rewrite !H; lia.
       destruct width_cases as [H|H]; rewrite !H; lia.
     }
-  Qed.    
+  Qed.
 
   Lemma zero_and (x : word)
     : word.and (word.of_Z 0) x = word.of_Z 0.
@@ -143,7 +141,7 @@ Section __.
     reflexivity.
   Qed.
 
-  
+
   Lemma zero_or (x : word)
     : word.or (word.of_Z 0) x = x.
   Proof.
@@ -163,7 +161,7 @@ Section __.
     rewrite word.morph_or.
     reflexivity.
   Qed.
-    
+
   Lemma cmove_word_is_conditional mask c1 c2
     : is_mask mask ->
       cmove_word mask c1 c2 = if word.eqb mask (word.of_Z 0) then c2 else c1.
@@ -246,7 +244,7 @@ Section __.
         tr' = tr /\
         (cell_value ptr1 (cmove_word mask c1 c2)
          * cell_value ptr2 c2 * R)%sep mem' }.
-  
+
   Derive cmove_word_br2fn SuchThat
          (defn! "cmove_word" ("mask", "c1", "c2") { cmove_word_br2fn },
           implements cmove_word)
@@ -265,7 +263,7 @@ Section __.
         let (c1',c2') := (cswap_word mask c1 c2) in
         (cell_value ptr1 c1'
          * cell_value ptr2 c2' * R)%sep mem' }.
-  
+
   Derive cswap_word_br2fn SuchThat
          (defn! "cswap_word" ("mask", "c1", "c2") { cswap_word_br2fn },
           implements cswap_word)
@@ -275,7 +273,7 @@ Section __.
   Qed.
 
 
-  
+
   Instance spec_of_cmove_array : spec_of "cmove_array" :=
     fnspec! "cmove_array" mask len ptr1 ptr2 / n c1 c2 R,
     (*TODO: if b then bw should be all 1s*)
