@@ -112,7 +112,7 @@ Section CompilerBasics.
          Functions := functions }>
       cmd.seq c0 c1
       <{ pred1 }>.
-  Proof. intros; cbn; eapply WeakestPrecondition_weaken; eauto. Qed.
+  Proof. intros; econstructor; eauto. Qed.
 
   (* FIXME find a way to automate the application of these copy lemmas *)
   (* N.B. should only be added to compilation tactics that solve their subgoals,
@@ -318,8 +318,8 @@ Section with_parameters.
           cmd tr mem locals post.
     Proof.
       unfold program. split; intros.
-      - eapply complete_cmd. eapply sound_cmd in H. eapply noskips_correct_bw. assumption.
-      - eapply complete_cmd. eapply sound_cmd in H. eapply noskips_correct_fw. assumption.
+      - eapply noskips_correct_bw. assumption.
+      - eapply noskips_correct_fw. assumption.
     Qed.
 
     Definition compile_setup_remove_skips := noskips_correct.
@@ -367,6 +367,7 @@ Section with_parameters.
         WeakestPrecondition.program functions
           (noreassign cmd) tr mem locals post.
     Proof.
+      unfold program.
       all: induction cmd;
         repeat match goal with
                | _ => apply IHcmd
@@ -376,18 +377,16 @@ Section with_parameters.
                  let h := fresh in intros h; specialize (H _ _ _ _ h)
                | [ H: exists _, _ |- _ ] => destruct H
                | [  |- exists _, _ ] => eexists
-               | [ H: context[WeakestPrecondition.cmd] |- context[WeakestPrecondition.cmd] ] => solve [eapply H; eauto]
+               | [ H: context[Semantics.exec] |- context[Semantics.exec] ] => solve [inversion H; econstructor; eauto]
                | _ => unfold WeakestPrecondition.program in * || cbn || intros ? || eauto
                end.
 
       - destruct (is_var_expr_spec rhs lhs); simpl in *; subst; eauto; [].
-        destruct H as (xx & Hxx & ->).
-        rewrite map.put_idemp in H0; assumption.
-      - eapply WeakestPrecondition_weaken, IHcmd1; eauto;
-          intros; eapply WeakestPrecondition_weaken, IHcmd2; eauto.
+        inversion H; subst. inversion H2. rewrite map.put_idemp in *; try assumption.
+        econstructor. assumption.
       - eapply refinement_while. 2: eassumption.
         unfold refinement. intros.
-        eapply sound_cmd. eapply IHcmd. eapply complete_cmd. assumption.
+        eapply IHcmd. assumption.
     Qed.
 
     Definition compile_setup_remove_reassigns := noreassign_correct.
@@ -444,7 +443,6 @@ Section with_parameters.
     Proof.
       intros.
       do 4 eexists. 1: eassumption. do 2 eexists. 1: eassumption.
-      eapply sound_cmd.
       eapply WeakestPrecondition_weaken; try eassumption.
       clear; firstorder eauto using getmany_list_map.
     Qed.
