@@ -297,8 +297,6 @@ Section Proofs.
                      try congruence)]
     end.
 
-  Import WP.
-
   (* TODO: try to use ProgramLogic *)
   Lemma capitalize_String_correct
         (addr : word) (s : Gallina.String) :
@@ -320,8 +318,8 @@ Section Proofs.
              (success = 1 /\ sep (String addr caps) R mem'))).
   Proof.
     cbv zeta. intros.
-    eapply mk_wp_call. 1: eassumption. 1: reflexivity.
-    eapply cmd_sound.
+    do 4 eexists. 1: eassumption. do 2 eexists. 1: reflexivity.
+    eapply sound_cmd.
 
     (* beginning of function body *)
     cbn [WeakestPrecondition.cmd WeakestPrecondition.cmd_body].
@@ -721,8 +719,8 @@ Section Proofs.
                   R mem'))).
   Proof.
     cbv zeta. intros.
-    eapply mk_wp_call. 1: eassumption. 1: reflexivity.
-    eapply cmd_sound.
+    do 4 eexists. 1: eassumption. do 2 eexists. 1: reflexivity.
+    eapply sound_cmd.
 
     (* beginning of function body *)
     cbn [WeakestPrecondition.cmd WeakestPrecondition.cmd_body].

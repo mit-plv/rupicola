@@ -385,8 +385,7 @@ Section with_parameters.
         rewrite map.put_idemp in H0; assumption.
       - eapply WeakestPrecondition_weaken, IHcmd1; eauto;
           intros; eapply WeakestPrecondition_weaken, IHcmd2; eauto.
-      - eapply WP.WP_Impl.mk_wp_cmd. eapply WP.WP_Impl.invert_wp_cmd in H.
-        eapply refinement_while. 2: eassumption.
+      - eapply refinement_while. 2: eassumption.
         unfold refinement. intros.
         eapply sound_cmd. eapply IHcmd. eapply complete_cmd. assumption.
     Qed.
@@ -427,7 +426,7 @@ Section with_parameters.
       clear; firstorder eauto using getmany_list_map.
     Qed.
 
-    Import bedrock2.Semantics bedrock2.WP.
+    Import bedrock2.Semantics.
 
     Lemma compile_setup_WeakestPrecondition_call_first {tr mem locals}
           name argnames retvars body args functions post:
@@ -444,8 +443,8 @@ Section with_parameters.
       WeakestPrecondition.call functions name tr mem args post.
     Proof.
       intros.
-      eapply mk_wp_call. 1,2: eassumption.
-      eapply cmd_sound.
+      do 4 eexists. 1: eassumption. do 2 eexists. 1: eassumption.
+      eapply sound_cmd.
       eapply WeakestPrecondition_weaken; try eassumption.
       clear; firstorder eauto using getmany_list_map.
     Qed.
