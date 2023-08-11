@@ -256,11 +256,9 @@ Section with_parameters.
       | _ => c
       end.
 
-    Lemma noskips_correct_fw:
-      forall cmd {tr mem locals functions} post,
-        Semantics.exec functions cmd tr mem locals post ->
-        Semantics.exec functions (noskips cmd) tr mem locals post.
+    Lemma noskips_correct_fw: forall cmd, refines (noskips cmd) cmd.
     Proof.
+      unfold refines.
       induction 1; cbn; try solve [econstructor; eauto].
       destruct (is_skip (noskips c1)) eqn:Sk1.
       - apply is_skip_sound in Sk1; rewrite Sk1 in *.
@@ -273,11 +271,9 @@ Section with_parameters.
         + eapply Semantics.exec.seq; eassumption.
     Qed.
 
-    Lemma noskips_correct_bw:
-      forall cmd {functions tr mem locals} post,
-        Semantics.exec functions (noskips cmd) tr mem locals post ->
-        Semantics.exec functions cmd tr mem locals post.
+    Lemma noskips_correct_bw: forall cmd, refines cmd (noskips cmd).
     Proof.
+      unfold refines.
       induction cmd; intros;
         match goal with
         | H: Semantics.exec.exec _ (noskips ?c) _ _ _ _ |- _ =>
@@ -293,7 +289,7 @@ Section with_parameters.
           eapply Semantics.exec.seq.
           { eapply IHcmd1. rewrite E1.
             eapply Semantics.exec.skip with
-              (post := fun t m l => t = tr /\ m = mem /\ l = locals).
+              (post := fun tr mem locals => t = tr /\ m = mem /\ l = locals).
             auto. }
           cbv beta. intros * (? & ? & ?); subst.
           eapply IHcmd2. assumption. }
@@ -307,7 +303,7 @@ Section with_parameters.
         { eapply IHcmd1. eassumption. }
         { intros. eapply IHcmd2. eauto. } }
       { cbn in *. eapply refinement_while. 2: exact H.
-        unfold refinement. intros *. eapply IHcmd. }
+        unfold refines. intros *. eapply IHcmd. }
     Qed.
 
     Lemma noskips_correct:
@@ -386,7 +382,7 @@ Section with_parameters.
       - eapply WeakestPrecondition_weaken, IHcmd1; eauto;
           intros; eapply WeakestPrecondition_weaken, IHcmd2; eauto.
       - eapply refinement_while. 2: eassumption.
-        unfold refinement. intros.
+        unfold refines. intros.
         eapply sound_cmd. eapply IHcmd. eapply complete_cmd. assumption.
     Qed.
 
