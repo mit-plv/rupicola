@@ -5,11 +5,9 @@ Require Import Rupicola.Lib.Tactics.
 Section CompilerBasics.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
   Context {localsT: map.map String.string word}.
-  Context {env: map.map String.string (list String.string * list String.string * Syntax.cmd)}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
   Context {locals_ok : map.ok localsT}.
-  Context {env_ok : map.ok env}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Lemma compile_word_of_Z_constant {tr mem locals functions} (z: Z) :
