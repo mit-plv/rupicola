@@ -1180,7 +1180,7 @@ Section Aliasing.
                 (truncated_word sz (mem := Mem)).
   Proof.
     red. intros * h Hmem.
-    pose proof bytes_per_range.
+    pose proof bytes_per_range sz.
     rewrite word.unsigned_of_Z_nowrap in h by lia.
     unfold scalar, truncated_word, truncated_scalar,
     littleendian, ptsto_bytes.ptsto_bytes in *.
