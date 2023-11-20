@@ -9,7 +9,7 @@ Require Import
         coqutil.Word.Naive
         coqutil.Map.SortedListWord.
 #[export]
-Existing Instances Word.Naive.word Word.Naive.word32_ok SortedListWord.map SortedListWord.ok.
+Existing Instances Word.Naive.word Word.Naive.word32_ok SortedListWord.map SortedListWord.ok BW32.
 Notation word := word32.
 
 Coercion co_word_of_Z := word.of_Z (word := word).
