@@ -279,7 +279,7 @@ Section with_parameters.
     Proof.
       intros; rewrite Hput by lia.
       rewrite List.firstn_app.
-      rewrite List.firstn_firstn, Min.min_idempotent.
+      rewrite List.firstn_firstn, Nat.min_idempotent.
       rewrite List.firstn_length_le by lia.
       rewrite Nat.sub_diag; cbn [List.firstn]; rewrite app_nil_r.
       reflexivity.

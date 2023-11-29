@@ -29,7 +29,8 @@ Section Gallina.
       Nat.iter n f a = downto' a i (i + n) (fun a _ => f a).
   Proof.
     unfold downto'.
-    setoid_rewrite skipn_seq_step; setoid_rewrite minus_plus.
+    setoid_rewrite skipn_seq_step.
+    setoid_rewrite (Nat.add_comm _ n); setoid_rewrite Nat.add_sub.
     simpl; induction n; simpl; intros.
     - reflexivity.
     - rewrite fold_left_app.
