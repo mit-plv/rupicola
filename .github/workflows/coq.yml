@@ -63,3 +63,15 @@ jobs:
       run: make -j2 deps
     - name: make all
       run: make -j2 all
+
+  coq-check-all:
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+    - run: echo 'build passed'
+      if: ${{ needs.build.result == 'success' }}
+    - run: echo 'build failed' && false
+      if: ${{ needs.build.result != 'success' }}
+    - run: echo 'test-standalone failed' && false
+      if: ${{ needs.test-standalone.result != 'success' }}
