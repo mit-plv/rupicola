@@ -21,6 +21,10 @@ jobs:
         - { COQ_VERSION: "master", COQ_PACKAGE: "coq libcoq-core-ocaml-dev"         , PPA: "ppa:jgross-h/coq-master-daily" }
       fail-fast: false
 
+    concurrency:
+      group: ${{ github.workflow }}-coq-${{ matrix.env.COQ_VERSION }}-${{ github.head_ref || github.run_id }}
+      cancel-in-progress: true
+
     env: ${{ matrix.env }}
 
     steps:
