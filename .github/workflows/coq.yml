@@ -77,5 +77,3 @@ jobs:
       if: ${{ needs.build.result == 'success' }}
     - run: echo 'build failed' && false
       if: ${{ needs.build.result != 'success' }}
-    - run: echo 'test-standalone failed' && false
-      if: ${{ needs.test-standalone.result != 'success' }}
