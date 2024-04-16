@@ -1,6 +1,7 @@
 From Coq Require Export
      Classes.Morphisms Numbers.DecimalString
      String List ZArith Lia.
+From Coq Require Vector.
 From bedrock2 Require Export
      Array ArrayCasts Map.Separation ProgramLogic
      Map.SeparationLogic Scalars Syntax WeakestPreconditionProperties
