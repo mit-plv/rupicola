@@ -2,7 +2,7 @@
 
 Require Coq.Init.Byte Coq.Strings.String. Import Init.Byte(byte(..)) String.
 Require Import coqutil.Datatypes.List. Import Lists.List List.ListNotations.
-Require Import Coq.ZArith.BinInt. Import Zdiv. Local Open Scope Z_scope.
+From Coq Require Import BinInt. Import Zdiv. Local Open Scope Z_scope.
 Require Import coqutil.Byte coqutil.Word.LittleEndianList.
 
 (* reference: https://datatracker.ietf.org/doc/html/rfc8439 *)
