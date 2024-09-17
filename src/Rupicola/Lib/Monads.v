@@ -1,4 +1,4 @@
-From Coq Require Import Strings.String Logic.FunctionalExtensionality.
+From Coq Require Import String FunctionalExtensionality.
 From Rupicola.Lib Require Import Core.
 
 Set Implicit Arguments.
