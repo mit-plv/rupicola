@@ -326,6 +326,8 @@ Module TC.
            end).
 
   Class __IdentToString := __identToString: string.
+
+  Set Default Proof Mode "Classic". (* after Rocq 9, Default Proof Mode "Ltac2" will parse hint extern as ltac2 *)
   #[global] Hint Extern 1 __IdentToString => serialize_ident_in_context : typeclass_instances.
 
   Notation ident_to_string a :=
