@@ -1,5 +1,6 @@
 Require Import Rupicola.Lib.Core.
 Require Import Rupicola.Lib.Notations.
+Require Import bedrock2.anybytes.
 
 Section with_parameters.
   Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
@@ -15,12 +16,14 @@ Section with_parameters.
     size_in_bytes : Z;
     size_in_bytes_mod
     : size_in_bytes mod Memory.bytes_per_word width = 0;
+    size_in_bytes_fits
+    : size_in_bytes <= 2^width;
     P_to_bytes
     : forall px x,
-        Lift1Prop.impl1 (P px x) (Memory.anybytes px size_in_bytes);
+        Lift1Prop.impl1 (P px x) (anybytes px size_in_bytes);
     P_from_bytes
     : forall px,
-        Lift1Prop.impl1 (Memory.anybytes px size_in_bytes)
+        Lift1Prop.impl1 (anybytes px size_in_bytes)
                         (Lift1Prop.ex1 (P px))
     }.
 
@@ -51,11 +54,13 @@ Section with_parameters.
        alloc_of_bytes (alloc_to_bytes a) Hlen = a.
      Proof. … Qed. *)
 
-  Program Instance Allocable_scalar : Allocable scalar :=
+  #[refine]
+  Instance Allocable_scalar : Allocable scalar :=
     {| size_in_bytes := Memory.bytes_per_word width;
        size_in_bytes_mod := Z_mod_same_full _;
        P_to_bytes := scalar_to_anybytes;
        P_from_bytes := anybytes_to_scalar |}.
+  Proof. abstract (case BW as [ [ -> | -> ] ]; cbv; discriminate). Defined.
 
   Definition pred_sep {A} R (pred : A -> predicate) (v : A) tr' mem' locals':=
     (R * (fun mem => pred v tr' mem locals'))%sep mem'.
@@ -77,7 +82,7 @@ Section with_parameters.
              Locals := map.put l out_var out_ptr;
              Functions := functions }>
           k_impl
-          <{ pred_sep (Memory.anybytes out_ptr size_in_bytes)
+          <{ pred_sep (anybytes out_ptr size_in_bytes)
                       pred (nlet_eq [out_var] v k) }>) ->
       <{ Trace := tr;
          Memory := m;
@@ -86,16 +91,14 @@ Section with_parameters.
       cmd.stackalloc out_var size_in_bytes k_impl
       <{ pred (nlet_eq [out_var] (stack v) k) }>.
   Proof.
-    repeat straightline; split; eauto using size_in_bytes_mod.
-    intros out_ptr mStack mCombined [out Hout]%P_from_bytes; repeat straightline.
-    eapply WeakestPrecondition_weaken
-      with (p1 := pred_sep (Memory.anybytes out_ptr size_in_bytes)
-                           pred (let/n x as out_var eq:Heq := v in k x Heq)).
-    - unfold pred_sep, Basics.flip; simpl.
-      intros * [mem1 [mem2 ?]].
-      exists mem2, mem1; intuition. apply map.split_comm; eauto.
-    - eapply H1.
-      exists mStack, m; intuition eauto. apply map.split_comm; eauto.
+    repeat straightline; split; eauto using size_in_bytes_mod; intros.
+    edestruct P_from_bytes with (px:=a) (x:=OfListWord.map.of_list_word_at a stack0).
+    { split; eauto using size_in_bytes_fits. }
+    eapply WeakestPrecondition_weaken; [|eapply H1]; cycle 1.
+    { eexists _, _; ssplit; try eapply map.split_comm; eauto. }
+    unfold pred_sep, Basics.flip; simpl.
+    intros * [mem1 [mem2 (?&(?&stack'&?&?)&?)]]; subst mem1.
+    exists mem2, stack'; intuition. apply map.split_comm; eauto.
   Qed.
 
 End with_parameters.

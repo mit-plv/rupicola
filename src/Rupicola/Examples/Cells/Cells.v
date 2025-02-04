@@ -83,19 +83,17 @@ Section with_parameters.
     repeat straightline. eauto.
   Qed.
 
-  #[global] Program Instance SimpleAllocable_cell : Allocable cell_value :=
+  #[global] #[refine] Instance SimpleAllocable_cell : Allocable cell_value :=
     {| size_in_bytes := Memory.bytes_per_word width;
        size_in_bytes_mod := Z_mod_same_full _;
        P_to_bytes := _;
        P_from_bytes := _ |}.
-  Next Obligation.
-    apply (P_to_bytes (Allocable := Allocable_scalar)).
-  Qed.
-  Next Obligation.
-    intros m H.
+  { apply (size_in_bytes_fits (Allocable := Allocable_scalar)). }
+  { intros; apply (P_to_bytes (Allocable := Allocable_scalar)). }
+  { intros ? m H.
     edestruct (P_from_bytes (Allocable := Allocable_scalar) _ _ H).
-    exists {| data := x |}. assumption.
-  Qed.
+    exists {| data := x |}. assumption. }
+  Defined.
 End with_parameters.
 
 #[export] Hint Extern 1 => simple eapply compile_get; shelve : compiler.

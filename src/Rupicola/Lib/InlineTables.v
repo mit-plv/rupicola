@@ -194,7 +194,7 @@ Section __.
         [|- ?P (OfListWord.map.of_list_word_at ?p ?xs)] =>
          assert (array ptsto (word.of_Z 1) p xs
                        (OfListWord.map.of_list_word_at p xs)) as H1;
-           [apply ptsto_bytes.array1_iff_eq_of_list_word_at; eauto using mem_ok|
+           [apply bytarray_as_bytes; eauto using mem_ok|
            generalize dependent (OfListWord.map.of_list_word_at p xs); intros]
       end.
     {
@@ -260,7 +260,7 @@ Section __.
                        (word.of_Z 0 : word)
                        (word_to_bytes a ++ to_byte_table t))).
       {
-        eapply ptsto_bytes.array1_iff_eq_of_list_word_at; auto using mem_ok.
+        eapply array1_iff_eq_of_list_word_at; auto using mem_ok.
       }
       seprewrite_in @array_append H0.
       seprewrite_in @scalar_of_bytes H0; auto.
