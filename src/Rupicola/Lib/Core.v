@@ -25,7 +25,6 @@ Declare Scope sep_scope.
 Delimit Scope sep_scope with sep.
 Infix "*" := (sep) : sep_scope.
 
-Global Set Nested Proofs Allowed.
 Global Set Default Goal Selector "1".
 
 Module P2.
