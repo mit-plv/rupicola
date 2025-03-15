@@ -1,5 +1,4 @@
-From Coq Require Import
-     String Numbers.DecimalString.
+From Coq Require Import String DecimalString.
 
 Definition _gs (prefix: string) (n: nat) :=
   ("_gs_" ++ prefix ++ NilEmpty.string_of_uint (Nat.to_uint n))%string.

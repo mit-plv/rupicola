@@ -1,4 +1,4 @@
-From Coq Require Logic.Eqdep Sets.Ensembles.
+From Coq Require Eqdep Ensembles.
 Require Import Rupicola.Lib.Api.
 Require Export Rupicola.Examples.IO.Writer.
 
