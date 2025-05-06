@@ -1,4 +1,4 @@
-Require Import Coq.ZArith.ZArith Coq.Lists.List.
+From Coq Require Import ZArith List.
 Import ListNotations.
 Open Scope Z_scope.
 

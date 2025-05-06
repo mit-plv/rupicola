@@ -1,5 +1,5 @@
 From Coq Require Export
-     Classes.Morphisms Numbers.DecimalString
+     Morphisms DecimalString
      String List ZArith Lia.
 From Coq Require Vector.
 From bedrock2 Require Export
