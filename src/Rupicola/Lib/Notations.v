@@ -1,7 +1,6 @@
 Require Export bedrock2.WeakestPrecondition.
 Require Export bedrock2.Syntax.
 Require Import Rupicola.Lib.Core.
-Require Import Rupicola.Lib.Monads.
 Require Import Rupicola.Lib.IdentParsing.
 Require Import Rupicola.Lib.Tactics.
 
@@ -150,18 +149,6 @@ Notation "'let/n' ( x , y , z , t ) := val 'in' body" :=
         IdentParsing.TC.ident_to_string t]
         val (fun xyz => let '\< x, y, z, t \> := xyz in body))
     (at level 200, x name, y name, z name, t name, body at level 200,
-     only parsing).
-
-Notation "'call!' x" := (Free.Call x) (x at level 200, at level 10).
-
-Notation "'let/!' x 'as' nm := val 'in' body" :=
-  (mbindn [nm] val (fun x => body))
-    (at level 200, x name, body at level 200,
-     format "'[hv' '[' '[' 'let/!'  x  'as'  nm ']'  :=  '/  ' val  'in' ']'  '/' body ']'").
-
-Notation "'let/!' x := val 'in' body" :=
-  (mbindn [IdentParsing.TC.ident_to_string x] val (fun x => body))
-    (at level 200, x name, body at level 200,
      only parsing).
 
 (* FIXME add a notation for loops? *)
