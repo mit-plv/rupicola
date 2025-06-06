@@ -1,4 +1,4 @@
-Require Import Rupicola.Lib.Api.
+Require Import Rupicola.Lib.Api Rupicola.Lib.Monads.
 Require Import Rupicola.Examples.IO.Writer.
 
 Import Writer.
