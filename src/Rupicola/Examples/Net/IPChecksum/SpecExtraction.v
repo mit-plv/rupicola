@@ -1,6 +1,6 @@
 Require Import Rupicola.Examples.Net.IPChecksum.IPChecksum.
 
-Require Import ZArith ExtrOcamlZInt ExtrOcamlNatInt ExtrOcamlNativeString.
+From Coq Require Import ZArith ExtrOcamlZInt ExtrOcamlNatInt ExtrOcamlNativeString.
 Extract Inlined Constant Byte.to_N => "Char.code".
 Extract Inlined Constant Z.land => "(land)".
 Extract Inlined Constant Z.lor => "(lor)".
