@@ -1,5 +1,5 @@
 From Coq Require Eqdep Ensembles.
-Require Import Rupicola.Lib.Api.
+Require Import Rupicola.Lib.Api Rupicola.Lib.Monads.
 Require Export Rupicola.Examples.IO.Writer.
 
 Open Scope list_scope.

@@ -1,5 +1,5 @@
 (*! IP Checksum, from https://www.rfc-editor.org/rfc/rfc1071 !*)
-Require Import ZArith.
+From Coq Require Import ZArith.
 From coqutil Require Export
      Datatypes.List
      Byte

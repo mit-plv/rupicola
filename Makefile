@@ -103,7 +103,7 @@ clean_bedrock2:
 	$(MAKE) --no-print-directory -C $(BEDROCK2_FOLDER) clean
 
 install_bedrock2:
-	$(MAKE) --no-print-directory -C $(BEDROCK2_FOLDER) install
+	$(MAKE) --no-print-directory -C $(BEDROCK2_FOLDER) install_noex
 
 cleanall: clean clean_coqutil clean_bedrock2
 

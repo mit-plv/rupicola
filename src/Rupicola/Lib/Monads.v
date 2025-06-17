@@ -1,5 +1,5 @@
 From Coq Require Import String FunctionalExtensionality.
-From Rupicola.Lib Require Import Core.
+From Rupicola.Lib Require Import Core IdentParsing.
 
 Set Implicit Arguments.
 
@@ -82,3 +82,15 @@ End Free.
 
 #[global]
 Hint Rewrite @mbindn_mbindn @mret_mbindn : compiler_cleanup.
+
+Notation "'call!' x" := (Free.Call x) (x at level 200, at level 10).
+
+Notation "'let/!' x 'as' nm := val 'in' body" :=
+  (mbindn [nm] val (fun x => body))
+    (at level 200, x name, body at level 200,
+     format "'[hv' '[' '[' 'let/!'  x  'as'  nm ']'  :=  '/  ' val  'in' ']'  '/' body ']'").
+
+Notation "'let/!' x := val 'in' body" :=
+  (mbindn [IdentParsing.TC.ident_to_string x] val (fun x => body))
+    (at level 200, x name, body at level 200,
+     only parsing).
