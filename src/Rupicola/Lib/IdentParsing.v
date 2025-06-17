@@ -1,6 +1,6 @@
 (*! Frontend | Ltac2-based identifier parsing for prettier notations !*)
-Require Import Coq.NArith.NArith Coq.Strings.String.
-Require Import Coq.Init.Byte.
+From Coq Require Import NArith String.
+From Coq.Init Require Import Byte.
 Require Import Ltac2.Ltac2.
 
 Import Ltac2.Init.

@@ -158,7 +158,7 @@ Definition buf_unborrow_data (b: Buffer) (bs: Bytes) :=
 
 Require Import Arith PeanoNat.
 
-Require Import Coq.Program.Wf.
+From Coq.Program Require Import Wf.
 Require Import Psatz.
 
 Program Fixpoint ranged_for_nat {A}

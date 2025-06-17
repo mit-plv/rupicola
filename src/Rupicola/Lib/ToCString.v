@@ -1,8 +1,8 @@
 (* Forked from bedrock2/src/bedrock2/ToCString.v *)
 Require Import bedrock2.Syntax bedrock2.Variables. Import bopname.
 Require Import coqutil.Datatypes.ListSet.
-Require Import Coq.ZArith.BinIntDef Coq.Numbers.BinNums Coq.Numbers.DecimalString.
-Require Import Coq.Strings.String. Local Open Scope string_scope.
+From Coq Require Import BinIntDef BinNums DecimalString.
+From Coq Require Import String. Local Open Scope string_scope.
 
 Definition prelude := "#include <stdint.h>
 #include <string.h>

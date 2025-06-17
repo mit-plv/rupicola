@@ -1,6 +1,6 @@
-Require Import Coq.ZArith.ZArith.
-Require Import Coq.Strings.String.
-Require Import Coq.Lists.List.
+From Coq Require Import ZArith.
+From Coq Require Import String.
+From Coq Require Import List.
 Require Import bedrock2.BasicC64Semantics.
 Require Import bedrock2.NotationsCustomEntry.
 Require Import bedrock2.ProgramLogic.

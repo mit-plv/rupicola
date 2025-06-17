@@ -1,4 +1,4 @@
-Require Import Coq.Strings.String Coq.Strings.Ascii.
+From Coq Require Import String Ascii.
 
 Section Spec.
   Open Scope string_scope.
@@ -26,7 +26,7 @@ Section Spec.
   Compute upstr_spec "rupicola".
 End Spec.
 
-Require Import Coq.Strings.Byte.
+From Coq Require Import Strings.Byte.
 Require Import Rupicola.Lib.Api.
 Require Import Rupicola.Lib.Loops.
 Require Import Rupicola.Lib.Arrays.
