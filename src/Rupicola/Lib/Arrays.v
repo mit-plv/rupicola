@@ -744,18 +744,6 @@ Section with_parameters.
       eauto using length_of_sizedlistarray_value.
     Qed.
 
-    Lemma sizedlistarray_value_max_length {len addr a R mem} :
-      (sizedlistarray_value len addr a ⋆ R) mem ->
-      (ai_width ai) * Z.of_nat len <= 2 ^ width.
-    Proof.
-      pose proof ai_width_bounded ai.
-      intros * (<- & Hmem)%sep_assoc%sep_emp_l.
-      etransitivity; [ | eapply array_max_length ]; eauto.
-      - rewrite word.unsigned_of_Z_nowrap by lia; reflexivity.
-      - destruct sz; apply scalar8_no_aliasing || apply scalar_no_aliasing1.
-      - rewrite word.unsigned_of_Z_nowrap; lia.
-    Qed.
-
     Lemma sizedlistarray_value_app1_length {len addr a1 a2 R mem} :
       (sizedlistarray_value len addr (a1 ++ a2) ⋆ R) mem ->
       (length a1 = len - length a2)%nat.

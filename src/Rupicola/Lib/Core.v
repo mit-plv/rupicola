@@ -1146,20 +1146,6 @@ Section Aliasing.
 
   Context {BW: Bitwidth width}.
 
-  (* From insertionsort.v in Bedrock2 *)
-  Lemma ptsto_no_aliasing': forall addr b1 b2 m (R: Mem -> Prop),
-      (ptsto addr b1 * ptsto addr b2 * R)%sep m ->
-      False.
-  Proof.
-    intros. unfold ptsto, sep, map.split, map.disjoint in *.
-    repeat match goal with
-           | H: exists _, _ |- _ => destruct H
-           | H: _ /\ _ |- _ => destruct H
-           end.
-    subst.
-    specialize (H4 addr b1 b2). rewrite ?map.get_put_same in H4. auto.
-  Qed.
-
   Lemma scalar8_no_aliasing :
     no_aliasing (word := word) (Mem := Mem) (word.of_Z 1) ptsto.
   Proof.
@@ -1171,43 +1157,8 @@ Section Aliasing.
         rewrite word.unsigned_add, word.unsigned_of_Z_0, Z.add_0_r.
       pose proof word.unsigned_range p; rewrite word.wrap_small by lia;
         reflexivity.
-    - eapply ptsto_no_aliasing'; eassumption.
+    - eapply ptsto_nonaliasing; eassumption.
   Qed.
-
-  Lemma scalar_no_aliasing1 sz :
-    no_aliasing (word := word) (Mem := Mem)
-                (word.of_Z (Z.of_nat (Memory.bytes_per (width := width) sz)))
-                (truncated_word sz (mem := Mem)).
-  Proof.
-    red. intros * h Hmem.
-    pose proof bytes_per_range sz.
-    rewrite word.unsigned_of_Z_nowrap in h by lia.
-    unfold scalar, truncated_word, truncated_scalar,
-    littleendian, ptsto_bytes.ptsto_bytes in *.
-    pose proof split_bytes_per_len sz a as Hlena.
-    pose proof split_bytes_per_len sz b as Hlenb.
-    rewrite 2HList.tuple.to_list_of_list in Hmem.
-    set (le_split _ _) as la in Hmem, Hlena.
-    set (le_split _ _) as lb in Hmem, Hlenb.
-    rewrite <- (firstn_skipn (Z.to_nat delta) la) in Hmem.
-    seprewrite_in @array_append Hmem; try lia.
-    assert (Z.to_nat delta <= Datatypes.length la)%nat
-      by (subst la; rewrite LittleEndianList.length_le_split; lia).
-    rewrite word.unsigned_of_Z_1, Z.mul_1_l, firstn_length_le, Z2Nat.id in Hmem by lia.
-    destruct lb; cbn -[Z.of_nat] in Hlenb; [ lia | ].
-    pose proof List.skipn_length (Z.to_nat delta) la as Hlena'.
-    destruct (List.skipn (Z.to_nat delta) la) eqn:Ha; cbn [List.length] in Hlena'; [ lia | ].
-    seprewrite_in @array_cons Hmem; try lia.
-    seprewrite_in @array_cons Hmem; try lia.
-    eapply ptsto_no_aliasing'; ecancel_assumption.
-  Qed.
-
-  Lemma scalar_no_aliasing2 :
-    no_aliasing (word := word) (Mem := Mem)
-                (word.of_Z (Z.of_nat (Memory.bytes_per
-                                        (width := width)
-                                        access_size.word))) scalar.
-  Proof. apply scalar_no_aliasing1. Qed.
 End Aliasing.
 
 Section Semantics.

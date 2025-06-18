@@ -1,7 +1,7 @@
 From Coq Require List.
 Require Import Rupicola.Lib.Core.
 Require Import Rupicola.Lib.Notations.
-Require Import bedrock2.Memory.
+Require Import bedrock2.Memory coqutil.Map.Memory.
 
 Module InlineTable.
   Section InlineTable.
@@ -74,7 +74,7 @@ Section __.
       eexists; split; eauto.
       unfold load, load_Z, load_bytes, map.getmany_of_tuple; simpl.
       rewrite OfListWord.map.get_of_list_word.
-      rewrite word.unsigned_of_Z_nowrap, Nat2Z.id by lia.
+      rewrite word.add_0_r, word.unsigned_of_Z_nowrap, Nat2Z.id by lia.
       rewrite nth_error_nth' with (d := cast default)
         by (rewrite map_length; lia).
       rewrite map_nth.
@@ -194,7 +194,7 @@ Section __.
         [|- ?P (OfListWord.map.of_list_word_at ?p ?xs)] =>
          assert (array ptsto (word.of_Z 1) p xs
                        (OfListWord.map.of_list_word_at p xs)) as H1;
-           [apply ptsto_bytes.array1_iff_eq_of_list_word_at; cbv [sepclause_of_map]; eauto using mem_ok|
+           [apply array1_iff_eq_of_list_word_at; cbv [sepclause_of_map]; eauto using mem_ok|
            generalize dependent (OfListWord.map.of_list_word_at p xs); intros]
       end.
     {
@@ -260,7 +260,7 @@ Section __.
                        (word.of_Z 0 : word)
                        (word_to_bytes a ++ to_byte_table t))).
       {
-        eapply ptsto_bytes.array1_iff_eq_of_list_word_at; cbv [sepclause_of_map]; auto using mem_ok.
+        eapply array1_iff_eq_of_list_word_at; cbv [sepclause_of_map]; auto using mem_ok.
       }
       seprewrite_in @array_append H0.
       seprewrite_in @scalar_of_bytes H0; auto.
