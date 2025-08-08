@@ -207,6 +207,13 @@ Ltac straightline_map_solver :=
 
 Ltac straightline' := straightline_plus ltac:(solve [straightline_map_solver]).
 
+Ltac assuming_correctness_of_in callees functions P :=
+  lazymatch callees with
+  | nil => P
+  | cons ?f ?callees =>
+    let f_spec := lazymatch constr:(_:spec_of f) with ?x => x end in
+    constr:(f_spec functions -> ltac:(let t := assuming_correctness_of_in callees functions P in exact t))
+  end.
 
 (* modified version of program_logic_goal_for_function, in which callee names
   are manually inserted *)
