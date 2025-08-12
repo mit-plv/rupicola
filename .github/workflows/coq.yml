@@ -57,7 +57,7 @@ jobs:
         echo "::group::echo | coqtop"
         echo | coqtop
         echo "::endgroup::"
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: submodules-init
       run: git submodule update --init --recursive
     - name: make dependencies
