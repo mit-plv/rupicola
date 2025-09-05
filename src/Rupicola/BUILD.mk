@@ -1,0 +1,10 @@
+RUPICOLA_DIR := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+RUPICOLA_VFILES := $(call rwildcard,$(RUPICOLA_DIR),*.v)
+RUPICOLA_COQDEPFLAGS := -Q $(RUPICOLA_DIR) $(notdir $(RUPICOLA_DIR))
+RUPICOLA_REQUIREFLAGS := -Q $(O)/$(RUPICOLA_DIR) $(notdir $(RUPICOLA_DIR))
+
+RUPICOLA_COQFLAGS := $(COQUTIL_REQUIREFLAGS) $(BEDROCK_REQUIREFLAGS) $(RUPICOLA_REQUIREFLAGS) -w -deprecated-from-Coq,-deprecated-since-9.0,-deprecated-since-8.20
+$(O)/$(RUPICOLA_DIR)/%.vo: private COQFLAGS += $(RUPICOLA_COQFLAGS)
+$(O)/$(RUPICOLA_DIR)/%.vos: private COQFLAGS += $(RUPICOLA_COQFLAGS)
+$(O)/$(RUPICOLA_DIR)/%.vok: private COQFLAGS += $(RUPICOLA_COQFLAGS)
+$(RUPICOLA_DIR)/_CoqProject: private COQFLAGS += $(RUPICOLA_COQFLAGS)
