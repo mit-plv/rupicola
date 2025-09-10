@@ -43,8 +43,8 @@ Ltac handle_call :=
   straightline_call;
   [ ssplit;
     lazymatch goal with
-    | |- sep _ _ _ => ecancel_assumption
-    | |- exists R, sep _ R _ => eexists; ecancel_assumption
+    | |- sep _ _ _ => ecancel_assumption_impl
+    | |- exists R, sep _ R _ => eexists; ecancel_assumption_impl
     | _ => idtac
     end
   | cbv [postcondition_func postcondition_func_norets] in *;
