@@ -3,9 +3,9 @@ Require Import Rupicola.Lib.Api.
 Section Gallina.
   Definition linkedlist A : Type := list A.
 
-  Definition ll_hd {A} : A -> linkedlist A -> A := hd.
+  Definition ll_hd {A} : A -> linkedlist A -> A := @hd _.
 
-  Definition ll_next {A} : linkedlist A -> linkedlist A := tl.
+  Definition ll_next {A} : linkedlist A -> linkedlist A := @tl _.
 End Gallina.
 
 Section Separation.
