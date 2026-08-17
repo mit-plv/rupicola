@@ -48,7 +48,7 @@ Section Generalizable.
     right; congruence.
   Qed.
 
-  Lemma only_differ_get (locals : locals) vars locals' v post :
+  Lemma only_differ_get (locals : @map.rep string word locals) vars locals' v post :
     map.only_differ locals vars locals' ->
     ~ vars v ->
     WeakestPrecondition.get locals v post ->
@@ -274,7 +274,7 @@ Section Proofs.
       apply iff1_sep_cancel.
       eapply @array_index_nat_inbounds
         with (n:=n) (default:=byte.of_Z 0);
-        eauto using wordok, mapok.
+        eauto; try typeclasses eauto.
       lia. }
     rewrite word.ring_morph_mul, !word.of_Z_unsigned.
     (* annoying separation-logic algebra *)
@@ -358,7 +358,7 @@ Section Proofs.
       split; [ cbn; right; reflexivity | ]. (* only_differ *)
       do 2 (eexists; split; [ reflexivity | ]). (* fetch i and c_ptr *)
       split; [ reflexivity | ]. (* measure = len s - i *)
-      split; [ cbn; rewrite word.unsigned_of_Z_0; lia | ]. (* i <= len s *)
+      split; [ cbn; lia | ]. (* i <= len s *)
 
       (* c_ptr = s_ptr + wordsize + i * charsize *)
       split.
@@ -398,7 +398,6 @@ Section Proofs.
 
       (* fetch the value of "len" from the start-of-loop locals *)
       cbv [WeakestPrecondition.get].
-      cbn.
       eexists; split; [ reflexivity | ].
 
       (* could do reflexivity here, but it helps later if we simplify the
@@ -410,6 +409,7 @@ Section Proofs.
       end.
       apply word.unsigned_range. }
 
+    cbv [Semantics.interp_binop].
     (* prove continue/break case depending on value of loop condition *)
     match goal with |- context [if ?x then _ else _] => destr x end;
       split; try (let X := fresh in intro X; cbv in X; congruence); [ | ].
