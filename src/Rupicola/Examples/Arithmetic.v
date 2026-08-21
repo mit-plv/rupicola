@@ -1,25 +1,20 @@
 Require Import Rupicola.Lib.Api.
 Require Import Rupicola.Lib.Arrays.
 Require Import Rupicola.Lib.Loops.
-From bedrock2 Require BasicC32Semantics BasicC64Semantics.
+From coqutil Require Bitwidth32 Bitwidth64.
+From bedrock2 Require Import BasicCSemantics.
+Require bedrock2.BasicC32Semantics bedrock2.BasicC64Semantics.
 
 Module Type FNV1A_params.
-  Parameter (width: Z) (BW: Bitwidth width) (word: word.word width) (mem: map.map word Byte.byte).
-  Existing Instance BW.
-  Existing Instance word.
-  Existing Instance mem.
-  Parameter locals: map.map String.string word.
-  Parameter ext_spec: bedrock2.Semantics.ExtSpec.
-  Parameter (wordok : word.ok word) (mapok : map.ok mem).
-  Parameter localsok : map.ok locals.
-  Parameter ext_spec_ok : Semantics.ext_spec.ok ext_spec.
+  Parameter (width: Z) (BW: Bitwidth width).
+  Notation word := (Naive.word width).
   Parameter prime : word.
   Parameter offset : word.
 End FNV1A_params.
 
 Module FNV1A (Import P: FNV1A_params).
-#[global]
-  Existing Instances BW word locals mem ext_spec wordok mapok localsok ext_spec_ok.
+  #[global]
+  Existing Instances BW.
   Import SizedListArrayCompiler.
 
   Definition update (hash data : word) :=
@@ -28,7 +23,6 @@ Module FNV1A (Import P: FNV1A_params).
     let/n hash := word.mul hash p in
     hash.
 
-  Implicit Type R : mem -> Prop.
 #[global]
   Instance spec_of_update : spec_of "update" :=
     fnspec! "update" (hash: word) (data: word) ~> hash',
@@ -111,7 +105,6 @@ Module Murmur3.
     let/n k := word.mul k (word.of_Z 461845907) in
     k.
 
-  Implicit Type R : mem -> Prop.
 #[global]
   Instance spec_of_scramble : spec_of "scramble" :=
     fnspec! "scramble" (k: word) ~> k',

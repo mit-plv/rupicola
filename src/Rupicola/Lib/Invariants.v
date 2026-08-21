@@ -60,7 +60,7 @@ Ltac infer_word_instance locals :=
   lazymatch type of locals with
   | map.rep (map := ?ls) =>
     lazymatch type of ls with
-    | map.map _ (word.rep (word := ?W)) => constr:(W)
+    | context [(word.rep (word := ?W))] => constr:(W)
     end
   end.
 
