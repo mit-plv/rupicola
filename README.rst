@@ -55,7 +55,7 @@ Chose your own adventure below:
 
 -  Learn about relational compilation by following `this tutorial <https://people.csail.mit.edu/cpitcla/thesis/relational-compilation.html>`__ or running through `this abridged version, as a Coq file <etc/relational-compilation-tutorial.v>`__.
 
--  Read about the design and implementation of Rupicola in `our PLDI 2022 paper <https://pit-claudel.fr/clement/papers/rupicola-PLDI22.pdf>`__, or in `this PhD dissertation <https://pit-claudel.fr/clement/PhD/RelationalCompilation_Pit-Claudel_2022.pdf>`__.
+-  Read about the design and implementation of Rupicola in `our PLDI 2022 paper <https://dl.acm.org/doi/10.1145/3519939.3523706>`__, or in `this PhD dissertation <https://pit-claudel.fr/clement/PhD/RelationalCompilation_Pit-Claudel_2022.pdf>`__.
 
 -  Watch the `Rupicola thesis defense <https://youtu.be/BG3RXB8hZo4>`__,
 
