@@ -18,7 +18,7 @@ lib: Makefile.coq.lib $(VS_LIB)
 	rm -f .coqdeps.d
 	$(MAKE) -f Makefile.coq.lib
 
-COQ_MAKEFILE := $(COQBIN)coq_makefile -f _CoqProject INSTALLDEFAULTROOT = Rupicola $(COQMF_ARGS)
+COQ_MAKEFILE := "$(COQBIN)rocq" makefile -f _CoqProject INSTALLDEFAULTROOT = Rupicola $(COQMF_ARGS)
 
 force:
 

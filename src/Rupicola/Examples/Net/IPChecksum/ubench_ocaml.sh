@@ -3,7 +3,7 @@ set -eu
 cd "$(dirname "$0")"
 
 ( cd ../../../../../
-  coqc ${COQFLAGS:-$(make -f Makefile.coqflags)} src/Rupicola/Examples/Net/IPChecksum/SpecExtraction.v
+  "${COQBIN}rocq" compile ${COQFLAGS:-$(make -f Makefile.coqflags)} src/Rupicola/Examples/Net/IPChecksum/SpecExtraction.v
 ) > ip_checksum_ocaml.ml
 
 CC="${CC:-cc}"
