@@ -363,8 +363,8 @@ Section Proofs.
       (* c_ptr = s_ptr + wordsize + i * charsize *)
       split.
       { rewrite wordsize_eq.
-        cbv [word]; cbn -[Z.pow].
-        rewrite Z.add_0_r, Z.mod_mod by lia.
+        cbn [Semantics.interp_binop].
+        rewrite word.mul_0_r, word.add_0_r.
         reflexivity. }
 
       (* memory state *)

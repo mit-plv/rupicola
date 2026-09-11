@@ -70,7 +70,12 @@ Import UnsizedListArrayCompiler.
 Hint Rewrite @word_of_byte_of_fin : compiler_side_conditions.
 #[local] Hint Resolve Fin_to_nat_lt : compiler_side_conditions.
 #[local] Hint Extern 1 => simple apply word_of_byte_sru_lt : compiler_side_conditions.
-#[local] Hint Extern 10 => cbn; lia : compiler_side_conditions.
+(* Only the arithmetic side conditions: the same hint on the locals-map goals
+   would reduce through the word operations of every local. *)
+#[local] Hint Extern 10 (_ < _) => cbn; lia : compiler_side_conditions.
+#[local] Hint Extern 10 (_ <= _) => cbn; lia : compiler_side_conditions.
+#[local] Hint Extern 10 (_ < _)%nat => cbn; lia : compiler_side_conditions.
+#[local] Hint Extern 10 (_ <= _)%nat => cbn; lia : compiler_side_conditions.
 
 Derive utf8_decode_br2fn SuchThat
        (defn! "utf8_decode" ("data") ~> "c", "e", "ptr"
