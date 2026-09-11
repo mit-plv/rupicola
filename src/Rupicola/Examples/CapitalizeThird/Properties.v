@@ -358,13 +358,13 @@ Section Proofs.
       split; [ cbn; right; reflexivity | ]. (* only_differ *)
       do 2 (eexists; split; [ reflexivity | ]). (* fetch i and c_ptr *)
       split; [ reflexivity | ]. (* measure = len s - i *)
-      split; [ cbn; lia | ]. (* i <= len s *)
+      split; [ rewrite word.unsigned_of_Z_0; cbn; lia | ]. (* i <= len s *)
 
       (* c_ptr = s_ptr + wordsize + i * charsize *)
       split.
       { rewrite wordsize_eq.
-        cbv [word]; cbn -[Z.pow].
-        rewrite Z.add_0_r, Z.mod_mod by lia.
+        cbn [Semantics.interp_binop].
+        rewrite word.mul_0_r, word.add_0_r.
         reflexivity. }
 
       (* memory state *)
