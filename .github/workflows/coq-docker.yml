@@ -16,8 +16,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - env: { COQ_VERSION: "9.0", DOCKER_COQ_VERSION: "9.0" }
-          os: 'ubuntu-latest'
         - env: { COQ_VERSION: "9.1", DOCKER_COQ_VERSION: "9.1" }
           os: 'ubuntu-latest'
         - env: { COQ_VERSION: "9.2", DOCKER_COQ_VERSION: "9.2" }
@@ -41,7 +39,9 @@ jobs:
       uses: coq-community/docker-coq-action@v1
       with:
         coq_version: ${{ matrix.env.DOCKER_COQ_VERSION }}
-        custom_script: sudo chmod -R a=u . && TIMED=1 make -j "$(nproc)" -k
+        custom_script: |
+          if ! [ -d "$(rocq -where)/user-contrib/Stdlib/Zmod" ]; then opam update -y && opam pin add -y rocq-stdlib 9.1.0; fi
+          sudo chmod -R a=u . && TIMED=1 make -j "$(nproc)" -k
     - name: install
       uses: coq-community/docker-coq-action@v1
       with:
