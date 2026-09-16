@@ -1,20 +1,22 @@
 Require Import Rupicola.Lib.Api.
 
 
-Inductive annotation {width: Z} {BW: Bitwidth width} {word: word.word width} : Type :=
-| Reserved : word -> annotation
-| Borrowed : word -> annotation
+Inductive annotation {width: Z} {BW: Bitwidth width} : Type :=
+| Reserved : bits width -> annotation
+| Borrowed : bits width -> annotation
 | Owned : annotation
 .
 
 Section KVStore.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
-  Local Notation annotation := (@annotation _ BW word).
+  Local Notation annotation := (@annotation _ BW).
 
   Definition AnnotatedValue_gen {value}
              (Value : word -> value -> mem -> Prop)
@@ -93,11 +95,11 @@ Section KVStore.
           (* { p -> start } *)
           (* space must already be allocated at start *)
           (truncated_scalar
-             access_size.word p (word.unsigned start)
+             access_size.word p (Zmod.unsigned start)
            * Lift1Prop.ex1
                (fun xs: list _ =>
                   sep (emp (length xs = init_map_size_in_bytes))
-                      (array ptsto (word.of_Z 1) start xs))
+                      (array ptsto (bits.of_Z width 1) start xs))
            * R)%sep mem ->
           WeakestPrecondition.call
             functions "map_init" tr mem [p]
@@ -117,11 +119,11 @@ Section KVStore.
             (fun tr' mem' rets =>
                tr = tr'
                /\ length rets = 2%nat
-               /\ let err := hd (word.of_Z 0) rets in
-                  let pv := hd (word.of_Z 0) (tl rets) in
+               /\ let err := hd Zmod.zero rets in
+                  let pv := hd Zmod.zero (tl rets) in
                   match map.get m k with
                   | Some (a, v) =>
-                    err = word.of_Z 0
+                    err = Zmod.zero
                     /\ (match a with
                         | Borrowed pv' => pv = pv'
                         | Reserved pv' => pv = pv'
@@ -135,7 +137,7 @@ Section KVStore.
                               end) * Key pk k * R)%sep mem'
                   | None =>
                     (* if k not \in m, err = true and no change *)
-                    err = word.of_Z 1
+                    err = Zmod.one
                     /\ (AnnotatedMap pm m * Key pk k * R)%sep mem'
                   end).
 
@@ -152,24 +154,24 @@ Section KVStore.
             (fun tr' mem' rets =>
                tr = tr'
                /\ length rets = 1%nat
-               /\ let was_overwrite := hd (word.of_Z 0) rets in
+               /\ let was_overwrite := hd Zmod.zero rets in
                   match map.get m k with
                   | Some (a, old_v) =>
                     match a with
                     | Borrowed _ => True (* no guarantees *)
                     | Reserved pv' =>
-                      was_overwrite = word.of_Z 1
+                      was_overwrite = Zmod.one
                       /\ (AnnotatedMap pm (map.put m k (Reserved pv', v))
                           * Key pk k * Value pv old_v * R)%sep mem'
                     | Owned =>
-                      was_overwrite = word.of_Z 1
+                      was_overwrite = Zmod.one
                       /\ (AnnotatedMap pm (map.put m k (Owned, v))
                           * Key pk k * Value pv old_v * R)%sep mem'
                     end
                   | None =>
                     (* if there was no previous value, the map consumes both
                        the key and value memory *)
-                    was_overwrite = word.of_Z 0
+                    was_overwrite = Zmod.zero
                     /\ (AnnotatedMap pm (map.put m k (Owned, v))
                         * R)%sep mem'
                   end).

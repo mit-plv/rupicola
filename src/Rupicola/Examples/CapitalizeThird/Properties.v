@@ -10,7 +10,7 @@ Require Import bedrock2.WeakestPreconditionProperties.
 Require Import bedrock2.Map.Separation.
 Require Import bedrock2.Map.SeparationLogic.
 Require Import coqutil.Byte.
-Require Import coqutil.Word.Interface coqutil.Word.Properties.
+Require Import coqutil.Word.Bitwidth coqutil.Word.Properties.
 Require Import coqutil.Map.Interface coqutil.Map.Properties.
 Require Import coqutil.Z.PushPullMod.
 Require Import coqutil.Tactics.Tactics.
@@ -24,8 +24,8 @@ Import ListNotations.
 Import CapitalizeThird.Bedrock2.
 
 #[global]
-Hint Rewrite word.unsigned_add word.unsigned_mul word.unsigned_of_Z
-     word.unsigned_of_Z_1 using lia : push_unsigned.
+Hint Rewrite Zmod.unsigned_add Zmod.unsigned_mul bits.unsigned_of_Z
+     bits.unsigned_1 using lia : push_unsigned.
 #[global]
 Hint Rewrite @firstn_length @skipn_length @map_length @app_length
   : push_length.
@@ -178,7 +178,7 @@ Section Proofs.
           (toupper_body : Byte.byte -> Byte.byte).
 
   Local Definition byte_to_word : Byte.byte -> word :=
-    fun b => word.of_Z (byte.unsigned b).
+    fun b => bits.of_Z _ (byte.unsigned b).
 
   Context
     (wordsize_eq : wordsize = 8) (* using C64 semantics; 8 bytes *)
@@ -200,10 +200,10 @@ Section Proofs.
     sep
       (emp (Z.of_nat (len s) < 2^64))
       (sep
-         (scalar addr (word.of_Z (Z.of_nat (len s))))
+         (scalar addr (bits.of_Z _ (Z.of_nat (len s))))
          (array ptsto
-                (word.of_Z charsize)
-                (word.add addr (word.of_Z wordsize))
+                (bits.of_Z _ charsize)
+                (Zmod.add addr (bits.of_Z _ wordsize))
                 (chars s))).
 
   Definition loop_invariant
@@ -217,11 +217,11 @@ Section Proofs.
     /\ WeakestPrecondition.get
          l' "c_ptr"
          (fun _c_ptr =>
-            let c_ptr := word.unsigned _c_ptr in
+            let c_ptr := Zmod.unsigned _c_ptr in
             WeakestPrecondition.get
               l' "i"
               (fun _i =>
-                 let i := Z.to_nat (word.unsigned _i) in
+                 let i := Z.to_nat (Zmod.unsigned _i) in
                  let partial : Gallina.String :=
                      {|len := len s;
                        chars :=
@@ -230,10 +230,10 @@ Section Proofs.
                  m = (len s - i)%nat
                  /\ (i <= len s)%nat
                  /\ c_ptr =
-                    word.unsigned
-                      (word.add
-                         (word.add s_ptr (word.of_Z wordsize))
-                         (word.mul (word.of_Z charsize) _i))
+                    Zmod.unsigned
+                      (Zmod.add
+                         (Zmod.add s_ptr (bits.of_Z _ wordsize))
+                         (Zmod.mul (bits.of_Z _ charsize) _i))
                  /\ sep (String s_ptr partial) R mem')).
 
   (* extracts the separation-logic condition for a single element of the
@@ -242,24 +242,24 @@ Section Proofs.
     sep (String addr s) R mem ->
     len s = length (chars s) ->
     (n < len s)%nat ->
-    naddr = word.add (word.add addr (word.of_Z wordsize))
-                     (word.mul (word.of_Z charsize)
-                               (word.of_Z (Z.of_nat n))) ->
+    naddr = Zmod.add (Zmod.add addr (bits.of_Z _ wordsize))
+                     (Zmod.mul (bits.of_Z _ charsize)
+                               (bits.of_Z _ (Z.of_nat n))) ->
     sep (ptsto naddr (List.hd (byte.of_Z 0) (List.skipn n (chars s))))
         (sep
            (sep
-              (array ptsto (word.of_Z charsize)
-                     (word.add addr (word.of_Z wordsize))
+              (array ptsto (bits.of_Z _ charsize)
+                     (Zmod.add addr (bits.of_Z _ wordsize))
                      (List.firstn n (Gallina.chars s)))
-              (array ptsto (word.of_Z charsize)
-                     (word.add
-                        (word.add (word.add addr (word.of_Z wordsize))
-                                  (word.mul (word.of_Z charsize)
-                                            (word.of_Z (Z.of_nat n))))
-                        (word.of_Z charsize))
+              (array ptsto (bits.of_Z _ charsize)
+                     (Zmod.add
+                        (Zmod.add (Zmod.add addr (bits.of_Z _ wordsize))
+                                  (Zmod.mul (bits.of_Z _ charsize)
+                                            (bits.of_Z _ (Z.of_nat n))))
+                        (bits.of_Z _ charsize))
                      (List.skipn (S n) (chars s))))
            (sep R
-                (scalar addr (word.of_Z (Z.of_nat (len s))))))
+                (scalar addr (bits.of_Z _ (Z.of_nat (len s))))))
         mem.
   Proof.
     intros; subst naddr.
@@ -276,7 +276,7 @@ Section Proofs.
         with (n:=n) (default:=byte.of_Z 0);
         eauto; try typeclasses eauto.
       lia. }
-    rewrite word.ring_morph_mul, !word.of_Z_unsigned.
+    rewrite Zmod.of_Z_mul, !Zmod.of_Z_unsigned.
     (* annoying separation-logic algebra *)
     rewrite sep_comm with (p:=sep R _).
     rewrite sep_comm with (q:=sep (ptsto _ _) _).
@@ -309,7 +309,7 @@ Section Proofs.
       WeakestPrecondition.call
         functions' "capitalize_String" tr mem [addr]
         (fun tr' mem' rets =>
-           let success := word.unsigned (hd (word.of_Z 0) rets) in
+           let success := Zmod.unsigned (hd Zmod.zero rets) in
            tr = tr' /\
            length rets = 1%nat /\
            ( (* either we failed and string is untouched, or... *)
@@ -358,13 +358,13 @@ Section Proofs.
       split; [ cbn; right; reflexivity | ]. (* only_differ *)
       do 2 (eexists; split; [ reflexivity | ]). (* fetch i and c_ptr *)
       split; [ reflexivity | ]. (* measure = len s - i *)
-      split; [ cbn; lia | ]. (* i <= len s *)
+      split; [ rewrite Zmod.of_Z_0, Zmod.unsigned_0; cbn; lia | ]. (* i <= len s *)
 
       (* c_ptr = s_ptr + wordsize + i * charsize *)
       split.
       { rewrite wordsize_eq.
         cbn [Semantics.interp_binop].
-        rewrite word.mul_0_r, word.add_0_r.
+        rewrite Zmod.mul_0_r, Zmod.add_0_r.
         reflexivity. }
 
       (* memory state *)
@@ -407,7 +407,7 @@ Section Proofs.
       match goal with |- ?x <= ?y < ?z =>
                       change (x <= y < 2 ^ 64)
       end.
-      apply word.unsigned_range. }
+      apply (bits.unsigned_range _ width_nonneg). }
 
     cbv [Semantics.interp_binop].
     (* prove continue/break case depending on value of loop condition *)
@@ -418,16 +418,16 @@ Section Proofs.
 
       (* first, simplify the hypothesis that says i < len *)
       repeat match goal with H : _ |- _ =>
-                             rewrite word.of_Z_unsigned in H end.
+                             rewrite Zmod.of_Z_unsigned in H end.
       let H :=
           match goal with
-            H : word.unsigned _ < word.unsigned (word.of_Z (Z.of_nat (len _))) |- _ =>
+            H : Zmod.unsigned _ < Zmod.unsigned (bits.of_Z _ (Z.of_nat (len _))) |- _ =>
             H end in
-        rewrite word.unsigned_of_Z in H;
-        cbv [word.wrap] in H;
+        rewrite bits.unsigned_of_Z in H;
+
         rewrite Z.mod_small in H by lia;
         apply Z2Nat.inj_lt in H;
-        [ | solve [apply word.unsigned_range] | lia ];
+        [ | solve [apply (bits.unsigned_range _ width_nonneg)] | lia ];
         rewrite Nat2Z.id in H.
 
       (* first line of loop body: unpack! x = toupper( load1( c_ptr ) ) *)
@@ -438,8 +438,8 @@ Section Proofs.
         cbn. cbv [WeakestPrecondition.get].
         eexists; split; [ eassumption | ].
         repeat match goal with
-                 H : word.unsigned _ = word.unsigned _ |- _ =>
-                 apply word.unsigned_inj in H
+                 H : Zmod.unsigned _ = Zmod.unsigned _ |- _ =>
+                 apply Zmod.unsigned_inj in H
                end.
 
         (* load char from c_ptr *)
@@ -448,7 +448,7 @@ Section Proofs.
         eapply load_one_of_sep.
 
         eapply char_array_lookup_sep; eauto;
-          [| rewrite Z2Nat.id, word.of_Z_unsigned by apply word.unsigned_range;
+          [| rewrite Z2Nat.id, Zmod.of_Z_unsigned by apply (bits.unsigned_range _ width_nonneg);
              subst; reflexivity ].
         cbn [Gallina.chars Gallina.len].
         autorewrite with push_length.
@@ -473,8 +473,8 @@ Section Proofs.
         eassumption. }
 
       repeat match goal with
-               H : word.unsigned _ = word.unsigned _ |- _ =>
-               apply word.unsigned_inj in H
+               H : Zmod.unsigned _ = Zmod.unsigned _ |- _ =>
+               apply Zmod.unsigned_inj in H
              end.
 
       (* get value from "x" *)
@@ -487,7 +487,7 @@ Section Proofs.
       cbv [WeakestPrecondition.store].
       eapply store_one_of_sep.
       { eapply char_array_lookup_sep; eauto;
-          [ | rewrite Z2Nat.id, word.of_Z_unsigned by apply word.unsigned_range;
+          [ | rewrite Z2Nat.id, Zmod.of_Z_unsigned by apply (bits.unsigned_range _ width_nonneg);
               subst; reflexivity ].
         cbn [Gallina.chars Gallina.len].
         autorewrite with push_length.
@@ -509,7 +509,7 @@ Section Proofs.
       (* end of loop body; prove invariant holds on new state *)
       match goal with
       | H : map.get _ "i" = Some ?w |- _ =>
-        exists (len s - Z.to_nat (word.unsigned w) - 1)%nat
+        exists (len s - Z.to_nat (Zmod.unsigned w) - 1)%nat
       end.
       cbn [Gallina.len Gallina.chars] in *.
       split; [ | lia ].
@@ -541,14 +541,14 @@ Section Proofs.
         cbn [Semantics.interp_binop].
         match goal with H : (Z.to_nat ?x < Gallina.len _)%nat |- _ =>
                         pose proof (proj1 (Nat2Z.inj_lt _ _) H);
-                          rewrite !Z2Nat.id in * by apply word.unsigned_range
+                          rewrite !Z2Nat.id in * by apply (bits.unsigned_range _ width_nonneg)
         end.
         match goal with
-          |- context [word.unsigned (word.add ?x ?y)] =>
-          pose proof word.unsigned_range x;
-            pose proof word.unsigned_range y;
+          |- context [Zmod.unsigned (Zmod.add ?x ?y)] =>
+          pose proof bits.unsigned_range x width_nonneg;
+            pose proof bits.unsigned_range y width_nonneg;
             autorewrite with push_unsigned in *;
-            cbv [word.wrap];
+
             rewrite Z.mod_small, Z2Nat.inj_add by lia
         end.
         change (Z.to_nat 1) with 1%nat.
@@ -562,7 +562,7 @@ Section Proofs.
         (* c_ptr = s_ptr + wordsize + (charsize * i) *)
         split.
         { subst; autorewrite with push_unsigned.
-          cbv [word.wrap]. Z.mod_equality. }
+          Z.mod_equality. }
 
         (* correct partial string is represented *)
         cbv [String]; cbn [Gallina.len Gallina.chars].
@@ -591,15 +591,15 @@ Section Proofs.
           with (n:=i) (default:=byte.of_Z 0) (xs:=ls)
             by (autorewrite with push_length; lia)
         end.
-        rewrite !Z2Nat.id by apply word.unsigned_range.
-        rewrite !word.of_Z_unsigned.
+        rewrite !Z2Nat.id by apply (bits.unsigned_range _ width_nonneg).
+        rewrite !Zmod.of_Z_unsigned.
 
         match goal with
           |- context
-               [(word.of_Z (word.unsigned ?x * word.unsigned ?y))] =>
-          replace (word.of_Z (word.unsigned x * word.unsigned y))
-          with (word.mul x y)
-            by (rewrite word.ring_morph_mul, !word.of_Z_unsigned;
+               [(bits.of_Z _ (Zmod.unsigned ?x * Zmod.unsigned ?y))] =>
+          replace (bits.of_Z _ (Zmod.unsigned x * Zmod.unsigned y))
+          with (Zmod.mul x y)
+            by (rewrite Zmod.of_Z_mul, !Zmod.of_Z_unsigned;
                 reflexivity)
         end.
 
@@ -616,9 +616,9 @@ Section Proofs.
         (* TODO: sepearate lemma? *)
         (* simplify the conversions on the selected element *)
         match goal with
-          |- context [byte.of_Z (word.unsigned (byte_to_word ?b))] =>
-          replace (byte.of_Z (word.unsigned (byte_to_word b))) with b
-            by (clear; pose proof (byte.unsigned_range b); cbv [byte_to_word]; rewrite word.unsigned_of_Z; cbv [word.wrap]; rewrite Z.mod_small, byte.of_Z_unsigned by (cbn in *; lia); reflexivity)
+          |- context [byte.of_Z (Zmod.unsigned (byte_to_word ?b))] =>
+          replace (byte.of_Z (Zmod.unsigned (byte_to_word b))) with b
+            by (clear; pose proof (byte.unsigned_range b); cbv [byte_to_word]; rewrite bits.unsigned_of_Z; rewrite Z.mod_small, byte.of_Z_unsigned by (cbn in *; lia); reflexivity)
         end.
 
         push_list_fast.
@@ -634,16 +634,16 @@ Section Proofs.
 
       (* first, simplify the hypothesis that says i >= len *)
       repeat match goal with H : _ |- _ =>
-                             rewrite word.of_Z_unsigned in H end.
+                             rewrite Zmod.of_Z_unsigned in H end.
       let H :=
           match goal with
-            H : word.unsigned (word.of_Z (Z.of_nat (len _))) <= _ |- _ =>
+            H : Zmod.unsigned (bits.of_Z _ (Z.of_nat (len _))) <= _ |- _ =>
             H end in
-        rewrite word.unsigned_of_Z in H;
-        cbv [word.wrap] in H;
+        rewrite bits.unsigned_of_Z in H;
+
         rewrite Z.mod_small in H by lia;
         apply Z2Nat.inj_le in H;
-        [ | lia | solve [apply word.unsigned_range] ];
+        [ | lia | solve [apply (bits.unsigned_range _ width_nonneg)] ];
         rewrite Nat2Z.id in H.
 
       (* use i >= len to remove firstn/skipn from loop invariant *)
@@ -662,7 +662,7 @@ Section Proofs.
 
       (* take care of easy postconditions *)
       cbn [length hd].
-      rewrite word.unsigned_of_Z_1.
+      rewrite bits.unsigned_1 by lia.
       repeat split; try reflexivity; [ ].
       right. split; [ reflexivity | ].
 
@@ -694,7 +694,7 @@ Section Proofs.
         (strings : list Gallina.String) :
     forall tr mem R,
       (* pointers in [inp] point to Strings in [strings] *)
-      sep (array String_ptr (word.of_Z wordsize) inp strings) R mem ->
+      sep (array String_ptr (bits.of_Z _ wordsize) inp strings) R mem ->
       (* strings are correctly formatted *)
       Forall (fun s => len s = length (chars s)) strings ->
       (* there are at least 3 strings *)
@@ -706,16 +706,16 @@ Section Proofs.
       WeakestPrecondition.call
         functions' "capitalize_3rd" tr mem [inp]
         (fun tr' mem' rets =>
-           let success := word.unsigned (hd (word.of_Z 0) rets) in
+           let success := Zmod.unsigned (hd Zmod.zero rets) in
            tr = tr' /\
            length rets = 1%nat /\
            ( (* either we failed and strings are untouched, or... *)
              (success = 0 /\
-              sep (array String_ptr (word.of_Z wordsize) inp strings)
+              sep (array String_ptr (bits.of_Z _ wordsize) inp strings)
                   R mem') \/
              (* we succeeded and 3rd string is correctly uppercase *)
              (success = 1 /\
-              sep (array String_ptr (word.of_Z wordsize) inp caps)
+              sep (array String_ptr (bits.of_Z _ wordsize) inp caps)
                   R mem'))).
   Proof.
     cbv zeta. intros.
@@ -759,7 +759,7 @@ Section Proofs.
         rewrite !sep_comm with (p:=scalar _ _).
         apply iff1_sep_cancel.
         cbn [Semantics.interp_binop].
-        rewrite word.unsigned_of_Z, wordsize_eq.
+        rewrite bits.unsigned_of_Z, wordsize_eq.
         reflexivity. } }
 
     (* call capitalize_String *)

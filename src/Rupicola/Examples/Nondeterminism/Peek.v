@@ -2,10 +2,12 @@ Require Import Rupicola.Lib.Api Rupicola.Lib.Monads.
 Require Import Rupicola.Examples.Nondeterminism.NonDeterminism.
 
 Section Peek.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -14,7 +16,7 @@ Section Peek.
   Definition bag_at (addr: word) (b: Bag) :=
     Lift1Prop.ex1 (fun words =>
                      emp (forall x, List.In x words <-> List.In x b) *
-                     array scalar (word.of_Z (Memory.bytes_per_word width))
+                     array scalar (bits.of_Z width (Memory.bytes_per_word width))
                            addr words)%sep.
 
   Definition peek (l: Bag) := %{ x | List.In x l }.
@@ -60,7 +62,7 @@ Section Peek.
   Definition nondet_sum_src (b: Bag) :=
     let/+ x := peek b in
     let/+ y := peek b in
-    let/n out := word.add x y in
+    let/n out := Zmod.add x y in
     mret out.
 
   Instance spec_of_nondet_sum : spec_of "nondet_sum" :=
@@ -84,4 +86,4 @@ Section Peek.
 End Peek.
 
 From bedrock2 Require Import BasicC64Semantics NotationsCustomEntry.
-Compute nondet_sum_br2fn. (* (word := word) *)
+Compute nondet_sum_br2fn. (* *)

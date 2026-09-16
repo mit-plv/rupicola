@@ -1,7 +1,9 @@
 Require Import Rupicola.Lib.Api.
 
 Section Tree.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
   Notation address := word.
@@ -74,7 +76,7 @@ Section Tree.
               {word_size_in_bytes : Z}.
 
       Local Notation word_offset :=
-        (word.of_Z word_size_in_bytes).
+        (bits.of_Z width word_size_in_bytes).
 
       Definition AnnotatedAlpha
                  (addr : word)
@@ -91,10 +93,10 @@ Section Tree.
                (t : tree (Annotated alpha))
         : mem -> Prop :=
         match t with
-        | Empty => emp (addr = word.of_Z 0)
+        | Empty => emp (addr = Zmod.zero)
         | Node a r l =>
-          let laddr := word.add addr word_offset in
-          let raddr := word.add laddr word_offset in
+          let laddr := Zmod.add addr word_offset in
+          let raddr := Zmod.add laddr word_offset in
           sep (AnnotatedAlpha addr a)
               (sep (Tree laddr l) (Tree raddr r))
         end.
@@ -131,14 +133,14 @@ Section Tree.
 
     Section sep.
       Context
-        {word_ok : word.ok word} {mem_ok : map.ok mem}
+ {mem_ok : map.ok mem}
         {locals_ok : map.ok locals}
         {ext_spec_ok : Semantics.ext_spec.ok ext_spec}
         {Alpha : word -> alpha -> mem -> Prop}
         {word_size_in_bytes : Z}.
 
       Local Notation word_offset :=
-        (word.of_Z word_size_in_bytes).
+        (bits.of_Z width word_size_in_bytes).
       Local Notation Tree :=
         (@Tree _ Alpha word_size_in_bytes).
 

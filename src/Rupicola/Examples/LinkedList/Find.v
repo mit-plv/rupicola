@@ -24,21 +24,23 @@ Section Gallina.
 End Gallina.
 
 Section Compile.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   (* TODO: generalize *)
   Local Notation LinkedList :=
-    (@LinkedList _ _ mem word access_size.word scalar) (only parsing).
+    (@LinkedList _ mem word access_size.word scalar) (only parsing).
   Local Notation word_size_in_bytes :=
     (@Memory.bytes_per width access_size.word).
   Local Notation next_word :=
     (fun p : word =>
-       word.add p (word.of_Z (Z.of_nat word_size_in_bytes))).
+       Zmod.add p (bits.of_Z width (Z.of_nat word_size_in_bytes))).
 
   Lemma compile_if_pointer : forall {tr} {mem:mem} {locals functions} {data} (c: bool) (t f: data),
     let v := if c then t else f in
@@ -87,11 +89,11 @@ Section Compile.
           (end_ptr dummy : word) (ll : linkedlist word) R
           ~> px,
        { requires tr mem :=
-           word.unsigned n = Z.of_nat (length ll) /\
+           Zmod.unsigned n = Z.of_nat (length ll) /\
            (0 < length ll)%nat /\ (* FIXME 0 < length is redundant *)
            (LinkedList end_ptr pll ll ⋆ R) mem;
          ensures tr' mem' :=
-           let result := ll_find dummy (word.eqb k) ll (length ll) in
+           let result := ll_find dummy (Zmod.eqb k) ll (length ll) in
            exists ll1, tr = tr' /\ ll = (ll1 ++ result) /\
                   (LinkedList px pll ll1 * LinkedList end_ptr px result * R)%sep mem' }.
 
@@ -134,7 +136,7 @@ Section Compile.
         (i_var := "n")
         (ghost_step :=
            fun st gst _ =>
-             if (word.eqb k (ll_hd dummy st))
+             if (Zmod.eqb k (ll_hd dummy st))
              then gst else (gst ++ [ll_hd dummy st])%list)
         (Inv := downto_inv R tr ll k end_ptr pll "k" "p").
 

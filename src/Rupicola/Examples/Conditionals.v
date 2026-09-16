@@ -1,10 +1,12 @@
 Require Import Rupicola.Lib.Api.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -12,7 +14,7 @@ Section with_parameters.
 
   Section Tail.
     Definition min (x y : word) :=
-      let/n c := word.ltu x y in
+      let/n c := Semantics.ltu x y in
       if c then
         let/n r := x in r
       else
@@ -35,10 +37,10 @@ Section with_parameters.
 
   Section Body.
     Definition minm (x y : word) :=
-      let/n r := if word.ltu x y
+      let/n r := if Semantics.ltu x y
                 then x
-                else word.add y (word.of_Z 1) in
-      let/n r := word.sub r (word.of_Z 1) in
+                else Zmod.add y Zmod.one in
+      let/n r := Zmod.sub r Zmod.one in
       r.
 
     Instance spec_of_minm : spec_of "minm" :=

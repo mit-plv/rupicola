@@ -6,13 +6,12 @@ Require Export
         Rupicola.Examples.Net.IPChecksum.Spec.
 Require Import
         bedrock2.FE310CSemantics
-        coqutil.Word.Naive
         coqutil.Map.SortedListWord.
 #[export]
-Existing Instances Word.Naive.word Word.Naive.word32_ok SortedListWord.map SortedListWord.ok BW32.
-Notation word := word32.
+Existing Instances SortedListWord.map SortedListWord.ok BW32.
+Notation word := (bits 32).
 
-Coercion co_word_of_Z := word.of_Z (word := word).
+Coercion co_word_of_Z := Zmod.of_Z (2 ^ 32).
 Coercion co_word_of_byte (b: byte) : word := word_of_byte b.
 #[export] Hint Unfold co_word_of_Z co_word_of_byte : compiler_cleanup.
 
@@ -95,16 +94,16 @@ Section Properties.
           reflexivity.
   Qed.
 
-  Definition word_onec_add16 w1 w2 :=
-    let sum := word.add (word := word) w1 w2 in
-    word.add (word.and sum (word.of_Z 65535)) (word.sru sum (word.of_Z 16)).
+  Definition word_onec_add16 (w1 w2: word) :=
+    let sum := Zmod.add w1 w2 in
+    Zmod.add (Zmod.and sum (bits.of_Z _ 65535)) (Semantics.sru sum 16).
 
   Lemma word_unsigned_onec_add w1 w2:
-    let z1 := word.unsigned w1 in
-    let z2 := word.unsigned w2 in
+    let z1 := Zmod.unsigned w1 in
+    let z2 := Zmod.unsigned w2 in
     0 <= z1 < 2 ^ 16 ->
     0 <= z2 < 2 ^ 16 ->
-    word.unsigned (word_onec_add16 w1 w2) =
+    Zmod.unsigned (word_onec_add16 w1 w2) =
     onec_add16 z1 z2.
   Proof.
     intros; unfold onec_add16, word_onec_add16.
@@ -112,10 +111,10 @@ Section Properties.
     pose proof Z_shiftr_add_carry 16 16 z1 z2 ltac:(lia) ltac:(lia) ltac:(lia).
 
     all: subst z1 z2.
-    repeat (rewrite ?word.unsigned_add, ?word.unsigned_and_nowrap;
-            rewrite ?word.unsigned_sru_shamtZ by lia;
-            rewrite ?word.unsigned_of_Z_nowrap, ?word.Z_land_wrap_l by lia).
-    rewrite_strat (repeat (innermost word.wrap_small)).
+    repeat (rewrite ?Zmod.unsigned_add, ?bits.unsigned_and;
+            rewrite ?Semantics.unsigned_sru_shamtZ by lia;
+            rewrite ?bits.unsigned_of_Z_small, ?word.Z_land_wrap_l by lia).
+    rewrite_strat (repeat (innermost Z.mod_small)).
 
     all: lia.
   Qed.
@@ -124,32 +123,32 @@ Section Properties.
     0 <= z1 < 2 ^ 16 ->
     0 <= z2 < 2 ^ 16 ->
     onec_add16 z1 z2 =
-    word.unsigned (word_onec_add16 (word.of_Z z1) (word.of_Z z2)).
+    Zmod.unsigned (word_onec_add16 (bits.of_Z _ z1) (bits.of_Z _ z2)).
   Proof.
     intros; rewrite word_unsigned_onec_add;
-      rewrite !word.unsigned_of_Z_nowrap; try lia.
+      rewrite !bits.unsigned_of_Z_small; try lia.
   Qed.
 
   Lemma word_morph_onec_add z1 z2:
     0 <= z1 < 2 ^ 16 ->
     0 <= z2 < 2 ^ 16 ->
-    word.of_Z (onec_add16 z1 z2) = word_onec_add16 (word.of_Z z1) (word.of_Z z2).
+    bits.of_Z _ (onec_add16 z1 z2) = word_onec_add16 (bits.of_Z _ z1) (bits.of_Z _ z2).
   Proof.
     pose proof onec_add16_loose_bounds z1 z2.
-    intros; apply word.unsigned_inj;
+    intros; apply Zmod.unsigned_inj;
       rewrite word_unsigned_onec_add;
-      rewrite !word.unsigned_of_Z_nowrap; try lia.
+      rewrite !bits.unsigned_of_Z_small; try lia.
   Qed.
 
   Lemma ip_checksum_impl_ok bs:
-    ip_checksum_impl bs = word.of_Z (ip_checksum bs).
+    ip_checksum_impl bs = bits.of_Z _ (ip_checksum bs).
   Proof.
     unfold ip_checksum, ip_checksum_impl, nlet, co_word_of_byte, co_word_of_Z.
     rewrite nd_ranged_for_all_combine2 by lia.
     rewrite <- fold_left_as_nd_ranged_for_all.
-    rewrite word.morph_and, word.morph_not.
+    rewrite word.morph_and, bits.of_Z_lnot.
     erewrite fold_left_push_fn
-      with (f' := fun w z => word_onec_add16 w (word.of_Z z))
+      with (f' := fun w z => word_onec_add16 w (bits.of_Z _ z))
            (P := fun x => in_bounds 16 x); cycle 1.
     { intros.
       eapply onec_add16_bounds; try eassumption.
@@ -174,9 +173,9 @@ Section Properties.
   Qed.
 
   Lemma ip_checksum_impl_ok' bs:
-    ip_checksum bs = word.unsigned (ip_checksum_impl bs).
+    ip_checksum bs = Zmod.unsigned (ip_checksum_impl bs).
   Proof.
-    rewrite ip_checksum_impl_ok, word.unsigned_of_Z_nowrap.
+    rewrite ip_checksum_impl_ok, bits.unsigned_of_Z_small.
     - reflexivity.
     - pose proof ip_checksum_bounds bs; lia.
   Qed.

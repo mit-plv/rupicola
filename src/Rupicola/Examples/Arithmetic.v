@@ -7,7 +7,7 @@ Require bedrock2.BasicC32Semantics bedrock2.BasicC64Semantics.
 
 Module Type FNV1A_params.
   Parameter (width: Z) (BW: Bitwidth width).
-  Notation word := (Naive.word width).
+  Notation word := (bits width).
   Parameter prime : word.
   Parameter offset : word.
 End FNV1A_params.
@@ -19,8 +19,8 @@ Module FNV1A (Import P: FNV1A_params).
 
   Definition update (hash data : word) :=
     let/n p := P.prime in
-    let/n hash := word.xor hash data in
-    let/n hash := word.mul hash p in
+    let/n hash := Zmod.xor hash data in
+    let/n hash := Zmod.mul hash p in
     hash.
 
 #[global]
@@ -40,12 +40,12 @@ Module FNV1A (Import P: FNV1A_params).
   Definition fnv1a (data: ListArray.t byte) len :=
     let/n p := P.prime in
     let/n hash := P.offset in
-    let/n from := word.of_Z 0 in
+    let/n from := Zmod.zero in
     let/n hash := ranged_for_u
                    from len
                    (fun hash tok idx Hlt =>
                       let/n b := ListArray.get data idx in
-                      let/n hash := word.mul (word.xor hash (word_of_byte b)) p in
+                      let/n hash := Zmod.mul (Zmod.xor hash (word_of_byte b)) p in
                       (tok, hash)) hash in
     hash.
 
@@ -53,7 +53,7 @@ Module FNV1A (Import P: FNV1A_params).
   Instance spec_of_fnv1a : spec_of "fnv1a" :=
     fnspec! "fnv1a" data_ptr len /
            (data: ListArray.t byte) n R
-           (pr: word.unsigned len < Z.of_nat n)
+           (pr: Zmod.unsigned len < Z.of_nat n)
            ~> hash,
     { requires tr mem :=
         (sizedlistarray_value AccessByte n data_ptr data ⋆ R) mem;
@@ -76,8 +76,8 @@ Module FNV1A32_params <: FNV1A_params.
   Definition width := 32%Z.
   Definition BW := Bitwidth32.BW32.
   Include BasicC32Semantics.
-  Definition prime : Naive.word32 := Eval compute in word.of_Z 16777619.
-  Definition offset : Naive.word32 := Eval compute in word.of_Z 2166136261.
+  Definition prime : word := Eval compute in bits.of_Z 32 16777619.
+  Definition offset : word := Eval compute in bits.of_Z 32 2166136261.
 End FNV1A32_params.
 
 Module FNV1A32 := FNV1A FNV1A32_params.
@@ -86,8 +86,8 @@ Module FNV1A64_params <: FNV1A_params.
   Definition width := 64%Z.
   Definition BW := Bitwidth64.BW64.
   Include BasicC64Semantics.
-  Definition prime : Naive.word64 := Eval compute in word.of_Z 1099511628211.
-  Definition offset : Naive.word64 := Eval compute in word.of_Z 14695981039346656037.
+  Definition prime : word := Eval compute in bits.of_Z 64 1099511628211.
+  Definition offset : word := Eval compute in bits.of_Z 64 14695981039346656037.
 End FNV1A64_params.
 
 Module FNV1A64 := FNV1A FNV1A64_params.
@@ -100,9 +100,9 @@ Module Murmur3.
   Import BasicC32Semantics.
 
   Definition scramble (k : word) :=
-    let/n k := word.mul k (word.of_Z 513432918353) in
-    let/n k := word.or (word.slu k (word.of_Z 15)) (word.sru k (word.of_Z 17)) in
-    let/n k := word.mul k (word.of_Z 461845907) in
+    let/n k := Zmod.mul k (bits.of_Z _ 513432918353) in
+    let/n k := Zmod.or (Semantics.slu k 15) (Semantics.sru k 17) in
+    let/n k := Zmod.mul k (bits.of_Z _ 461845907) in
     k.
 
 #[global]

@@ -31,10 +31,12 @@ End Writer.
 Import Writer.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {memT: map.map word Byte.byte}.
   Context {localsT: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
+  Context {mem_ok : map.ok memT}.
   Context {locals_ok : map.ok localsT}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 

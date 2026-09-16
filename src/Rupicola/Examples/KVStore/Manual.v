@@ -8,10 +8,12 @@ Require Import bedrock2.NotationsCustomEntry.
 Local Open Scope nat_scope.
 
 Section examples.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -23,11 +25,11 @@ Section examples.
 
     Context {ops} {key : Type}
             {kvp : kv_parameters}
-            {ok : @kv_parameters_ok  _ BW _ mem ops key Z Int kvp}.
+            {ok : @kv_parameters_ok _ BW mem ops key Z Int kvp}.
 
     Existing Instances map_ok annotated_map_ok key_eq_dec.
-    Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
-    Local Hint Extern 1 (spec_of "put") => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "put") => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
 
     Instance spec_of_add : spec_of "add" :=
       fun functions =>
@@ -38,14 +40,14 @@ Section examples.
             (fun tr' mem' rets =>
                tr = tr'
                /\ rets = []
-               /\ let out := word.wrap (x + y) in
+               /\ let out := ((x + y) mod 2 ^ width)%Z in
                   (Int px x * Int py y * Int pout out * R)%sep mem').
 
     (* look up k1 and k2, add their values and store in k3 *)
     Definition put_sum_gallina (m : map.rep (map:=map))
                (k1 k2 k3 : key) : map.rep (map:=map) :=
       match map.get m k1, map.get m k2 with
-      | Some v1, Some v2 => map.put m k3 (word.wrap (v1 + v2)%Z)
+      | Some v1, Some v2 => map.put m k3 ((v1 + v2) mod 2 ^ width)%Z
       | _, _ => m
       end.
 
@@ -73,10 +75,10 @@ Section examples.
             (fun tr' mem' rets =>
                tr = tr'
                /\ length rets = 1
-               /\ hd (word.of_Z 0) rets =
+               /\ hd Zmod.zero rets =
                   match map.get m k3 with
-                  | Some _ => word.of_Z 1
-                  | None => word.of_Z 0
+                  | Some _ => Zmod.one
+                  | None => Zmod.zero
                   end
                /\ (Map pm (put_sum_gallina m k1 k2 k3)
                    * Key pk1 k1 * Key pk2 k2 *
@@ -146,10 +148,10 @@ Section examples.
              | |- WeakestPrecondition.call _ ?f _ ?m ?args _ =>
                (* call add -- need to borrow all args first *)
                unify f "add";
-                 let in0 := (eval hnf in (hd (word.of_Z 0) args)) in
-                 let in1 := (eval hnf in (hd (word.of_Z 0) (tl args))) in
+                 let in0 := (eval hnf in (hd Zmod.zero args)) in
+                 let in1 := (eval hnf in (hd Zmod.zero (tl args))) in
                  let in2 :=
-                     (eval hnf in (hd (word.of_Z 0) (tl (tl args)))) in
+                     (eval hnf in (hd Zmod.zero (tl (tl args)))) in
                  try borrow in0; try borrow in1; try borrow in2;
                    handle_call; autorewrite with mapsimpl in *
              end.
@@ -164,11 +166,11 @@ Section examples.
   Section swap.
     Context {ops} {key value : Type} {Value}
             {kvp : kv_parameters}
-            {ok : @kv_parameters_ok _ BW _ mem ops key value Value kvp}.
+            {ok : @kv_parameters_ok _ BW mem ops key value Value kvp}.
 
     Existing Instances map_ok annotated_map_ok key_eq_dec.
-    Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
-    Local Hint Extern 1 (spec_of "put") => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
+    Local Hint Extern 1 (spec_of "put") => unshelve simple refine (@spec_of_map_put _ _ _ _ _ _ _ _ _ _) : typeclass_instances.
 
     (* look up k1 and k2, add their values and store in k3 *)
     Definition swap_gallina (m : map.rep (map:=map))

@@ -3,18 +3,20 @@ Require Import Rupicola.Lib.Api.
 Require Import Rupicola.Examples.Cells.Cells.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {wordok : word.ok word} {mapok : map.ok mem}.
+  Context {mapok : map.ok mem}.
   Context {localsok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
-  Local Notation cell := (@cell width BW word).
+  Local Notation cell := (@cell width BW).
 
   Definition indirect_add (b c: cell) :=
     let/n vb := get b in
     let/n vc := get c in
-    let/n r := word.add vb vc in
+    let/n r := Zmod.add vb vc in
     let/n a := put r in
     a.
 
@@ -110,7 +112,7 @@ Section with_parameters.
   (* Quick sanity check that Rupicola's notations unfold into code that's
      decently nice to work with: *)
   Notation "⟨ v ⟩" := {| data := v |}.
-  Goal forall a b c, indirect_add_three ⟨a⟩ ⟨b⟩ ⟨c⟩ = ⟨word.add (word.add a b) c⟩.
+  Goal forall a b c, indirect_add_three ⟨a⟩ ⟨b⟩ ⟨c⟩ = ⟨Zmod.add (Zmod.add a b) c⟩.
     reflexivity.
   Qed.
 

@@ -9,10 +9,12 @@ Section Gallina.
 End Gallina.
 
 Section Separation.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Context {element : Type} {element_size : access_size}
@@ -22,7 +24,7 @@ Section Separation.
     (@Memory.bytes_per width element_size).
   Local Notation skip_element :=
     (fun p : word =>
-       word.add p (word.of_Z (Z.of_nat element_size_in_bytes))).
+       Zmod.add p (bits.of_Z width (Z.of_nat element_size_in_bytes))).
 
   (* To have a LinkedList with elements inline, instantiate Element with
      something like [scalar] or [ptsto], and set the element_size to word or one
@@ -51,10 +53,12 @@ Section Separation.
 End Separation.
 
 Section Compile.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   (* TODO: generalize
@@ -68,12 +72,12 @@ Section Compile.
     (@LinkedList semantics element Element).
    *)
   Local Notation LinkedList :=
-    (@LinkedList _ word mem word access_size.word scalar) (only parsing).
+    (@LinkedList _ mem word access_size.word scalar) (only parsing).
   Local Notation word_size_in_bytes :=
     (@Memory.bytes_per width access_size.word).
   Local Notation next_word :=
     (fun p : word =>
-       word.add p (word.of_Z (Z.of_nat word_size_in_bytes))).
+       Zmod.add p (bits.of_Z width (Z.of_nat word_size_in_bytes))).
 
   (* TODO: these should probably use Owned/Reserved/Borrowed annotations *)
 
@@ -162,10 +166,12 @@ Section Compile.
 End Compile.
 
 Section Helpers.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Context {element : Type} {element_size : access_size}
@@ -175,9 +181,9 @@ Section Helpers.
     (@Memory.bytes_per width element_size).
   Local Notation skip_element :=
     (fun p : word =>
-       word.add p (word.of_Z (Z.of_nat element_size_in_bytes))).
+       Zmod.add p (bits.of_Z width (Z.of_nat element_size_in_bytes))).
   Local Notation LinkedList :=
-    (@LinkedList _ word mem element element_size Element).
+    (@LinkedList _ mem element element_size Element).
 
   Lemma LinkedList_snoc_iff1 :
     forall l pl x end_ptr,

@@ -1,14 +1,16 @@
 Require Import Rupicola.Lib.Api.
 
-Record  cell {width: Z} {BW: Bitwidth width} {word: word.word width} := { data : word }.
+Record  cell {width: Z} {BW: Bitwidth width} := { data : bits width }.
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {wordok : word.ok word} {mapok : map.ok mem}.
+  Context {mapok : map.ok mem}.
   Context {localsok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
-  Local Notation cell := (@cell width BW word).
+  Local Notation cell := (@cell width BW).
 
   Definition cell_value (addr: word) (c: cell)
     : mem -> Prop :=
