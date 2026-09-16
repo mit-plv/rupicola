@@ -2,10 +2,12 @@ Require Import Rupicola.Lib.Api.
 
 (* TODO: ideally, all compilation lemmas would now use seplogic for locals *)
 Section Var.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 

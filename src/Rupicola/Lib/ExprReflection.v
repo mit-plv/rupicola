@@ -2,10 +2,12 @@ From Rupicola Require Import Lib.Core Lib.Notations Lib.Tactics.
 
 Module ExprReflection.
   Section with_parameters.
-    Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
+    Context {width: Z} {BW: Bitwidth width}.
+    Local Notation word := (bits width).
+    Context {memT: map.map word Byte.byte}.
     Context {localsT: map.map String.string word}.
     Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-    Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
+    Context {mem_ok : map.ok memT}.
     Context {locals_ok : map.ok localsT}.
     Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -23,7 +25,7 @@ Module ExprReflection.
       Context {T} {er: expr_denotation T}.
 
       Inductive AST :=
-      | ELit (z: Z) (t: T) (ok: word.of_Z z = er_T2w t)
+      | ELit (z: Z) (t: T) (ok: bits.of_Z width z = er_T2w t)
       | EVar (nm: string)
       | EOp (op: er_op) (l r: AST).
 
@@ -132,29 +134,29 @@ Module ExprReflection.
 
     Instance expr_word_denotation : expr_denotation word :=
       {| er_T2w w := w;
-         er_default := word.of_Z 0;
+         er_default := Zmod.zero;
          er_op := bopname.bopname;
          er_opname op := op;
          er_opfun op :=
            match op with
-           | bopname.add => word.add
-           | bopname.sub => word.sub
-           | bopname.mul => word.mul
-           | bopname.mulhuu => word.mulhuu
-           | bopname.divu => word.divu
-           | bopname.remu => word.modu
-           | bopname.and => word.and
-           | bopname.or => word.or
-           | bopname.xor => word.xor
-           | bopname.sru => word.sru
-           | bopname.slu => word.slu
-           | bopname.srs => word.srs
-           | bopname.lts => fun x y => word.b2w (word.lts x y)
-           | bopname.ltu => fun x y => word.b2w (word.ltu x y)
-           | bopname.eq => fun x y => word.b2w (word.eqb x y)
+           | bopname.add => Zmod.add
+           | bopname.sub => Zmod.sub
+           | bopname.mul => Zmod.mul
+           | bopname.mulhuu => fun x y => bits.of_Z width (Zmod.unsigned x * Zmod.unsigned y / 2 ^ width)
+           | bopname.divu => Zmod.udiv
+           | bopname.remu => Zmod.umod
+           | bopname.and => Zmod.and
+           | bopname.or => Zmod.or
+           | bopname.xor => Zmod.xor
+           | bopname.sru => Semantics.sru
+           | bopname.slu => Semantics.slu
+           | bopname.srs => Semantics.srs
+           | bopname.lts => fun x y => word.b2w (Semantics.lts x y)
+           | bopname.ltu => fun x y => word.b2w (Semantics.ltu x y)
+           | bopname.eq => fun x y => word.b2w (Zmod.eqb x y)
            end;
          er_opfun_morphism :=
-           ltac:(destruct op; intros; cbn;
+           ltac:(destruct op; intros; cbv [Semantics.ltu Semantics.lts word.b2w]; cbn;
                 repeat lazymatch goal with
                        | [  |- context[if ?x then _ else _] ] => destruct x
                        | _ => reflexivity
@@ -163,7 +165,7 @@ Module ExprReflection.
     Inductive ReifiedZOpp := RZ_add | RZ_sub | RZ_mul | RZ_land | RZ_lor | RZ_lxor.
 
     Instance expr_Z_denotation : expr_denotation Z :=
-      {| er_T2w z := word.of_Z z;
+      {| er_T2w z := bits.of_Z width z;
          er_default := 0%Z;
          er_op := ReifiedZOpp;
          er_opname zop :=
@@ -187,7 +189,7 @@ Module ExprReflection.
          er_opfun_morphism :=
            ltac:(destruct op; intros; cbn;
                 eauto using word.morph_and, word.morph_or, word.morph_xor,
-                word.ring_morph_add, word.ring_morph_mul, word.ring_morph_sub;
+                Zmod.of_Z_add, Zmod.of_Z_mul, Zmod.of_Z_sub;
                 reflexivity) |}.
 
     Lemma compile_expr {A} (to_W: A -> word)
@@ -218,8 +220,8 @@ Module ExprReflection.
     Definition compile_expr_w := compile_expr (fun w => w).
     Definition compile_expr_bool := compile_expr (fun b => word.b2w b).
     Definition compile_expr_byte := compile_expr (fun b => word_of_byte b).
-    Definition compile_expr_nat := compile_expr (fun n => word.of_Z (Z.of_nat n)).
-    Definition compile_expr_Z := compile_expr (fun z => word.of_Z z).
+    Definition compile_expr_nat := compile_expr (fun n => bits.of_Z width (Z.of_nat n)).
+    Definition compile_expr_Z := compile_expr (fun z => bits.of_Z width z).
   End with_parameters.
 
   Ltac find_key_by_value bs v0 :=
@@ -236,34 +238,38 @@ Module ExprReflection.
     let expr_reify_op nm l r :=
         let l := expr_reify_word W bindings l in
         let r := expr_reify_word W bindings r in
-        constr:(EOp (word:=W) (er := expr_word_denotation) nm l r) in
+        constr:(EOp (width:=W) (er := expr_word_denotation) nm l r) in
     lazymatch w with (* FIXME add reification support for gt, ge, le, neg; also for Byte constants *)
-    | word.add ?l ?r    => expr_reify_op bopname.add l r
-    | word.sub ?l ?r    => expr_reify_op bopname.sub l r
-    | word.mul ?l ?r    => expr_reify_op bopname.mul l r
-    | word.mulhuu ?l ?r => expr_reify_op bopname.mulhuu l r
-    | word.divu ?l ?r   => expr_reify_op bopname.divu l r
-    | word.modu ?l ?r   => expr_reify_op bopname.remu l r
-    | word.and ?l ?r    => expr_reify_op bopname.and l r
-    | word.or ?l ?r     => expr_reify_op bopname.or l r
-    | word.xor ?l ?r    => expr_reify_op bopname.xor l r
-    | word.sru ?l ?r    => expr_reify_op bopname.sru l r
-    | word.slu ?l ?r    => expr_reify_op bopname.slu l r
-    | word.srs ?l ?r    => expr_reify_op bopname.srs l r
-    | word.b2w (word.lts ?l ?r) => expr_reify_op bopname.lts l r
-    | word.b2w (word.ltu ?l ?r) => expr_reify_op bopname.ltu l r
-    | word.b2w (word.eqb ?l ?r) => expr_reify_op bopname.eq l r
+    | Zmod.add ?l ?r    => expr_reify_op bopname.add l r
+    | Zmod.sub ?l ?r    => expr_reify_op bopname.sub l r
+    | Zmod.mul ?l ?r    => expr_reify_op bopname.mul l r
+    | bits.of_Z _ (Zmod.unsigned ?l * Zmod.unsigned ?r / 2 ^ _) => expr_reify_op bopname.mulhuu l r
+    | Zmod.udiv ?l ?r   => expr_reify_op bopname.divu l r
+    | Zmod.umod ?l ?r   => expr_reify_op bopname.remu l r
+    | Zmod.and ?l ?r    => expr_reify_op bopname.and l r
+    | Zmod.or ?l ?r     => expr_reify_op bopname.or l r
+    | Zmod.xor ?l ?r    => expr_reify_op bopname.xor l r
+    | Semantics.sru ?l ?r    => expr_reify_op bopname.sru l r
+    | Semantics.slu ?l ?r    => expr_reify_op bopname.slu l r
+    | Semantics.srs ?l ?r    => expr_reify_op bopname.srs l r
+    | word.b2w (Semantics.lts ?l ?r) => expr_reify_op bopname.lts l r
+    | word.b2w (Semantics.ltu ?l ?r) => expr_reify_op bopname.ltu l r
+    | word.b2w (Zmod.eqb ?l ?r) => expr_reify_op bopname.eq l r
     | _ =>
       lazymatch find_key_by_value bindings w with
-      | Some ?k => constr:(EVar (word:=W) (er := expr_word_denotation) k)
+      | Some ?k => constr:(EVar (width:=W) (er := expr_word_denotation) k)
       | None =>
         lazymatch w with
-        | word.of_Z ?z =>
-          constr:(ELit (word:=W) (er := expr_word_denotation)
-                       z (word.of_Z z) eq_refl)
+        | Zmod.zero =>
+          constr:(ELit (width:=W) (er := expr_word_denotation) 0 Zmod.zero (Zmod.of_Z_0 _))
+        | Zmod.one =>
+          constr:(ELit (width:=W) (er := expr_word_denotation) 1 Zmod.one (Zmod.of_Z_1 _))
+        | bits.of_Z _ ?z =>
+          constr:(ELit (width:=W) (er := expr_word_denotation)
+                       z (bits.of_Z W z) eq_refl)
         | _ =>
-          constr:(ELit (word:=W) (er := expr_word_denotation)
-                       (word.unsigned w) w (word.of_Z_unsigned w))
+          constr:(ELit (width:=W) (er := expr_word_denotation)
+                       (Zmod.unsigned w) w (Zmod.of_Z_unsigned w))
         end
       end
     end.
@@ -330,7 +336,7 @@ Module ExprReflection.
       lazymatch locals with
       | map.of_list ?bindings =>
         lazymatch type of val with
-        | @word.rep _ ?W =>
+        | Zmod (2 ^ ?W) =>
           let reified := expr_reify_word W bindings val in
           _reify_change_dexpr mem locals expr expr_word_denotation reified bindings
         end
@@ -344,8 +350,8 @@ Module ExprReflection.
     | [] => constr:(@List.nil (string * Z))
     | (?k, ?w) :: ?tl =>
       let z := lazymatch w with
-              | @word.of_Z _ _ ?z => constr:(z)
-              | _                 => constr:(word.unsigned w)
+              | Zmod.of_Z _ ?z => constr:(z)
+              | _                 => constr:(Zmod.unsigned w)
               end in
       let tl := zify_bindings tl in
       constr:((k, z) :: tl)
@@ -357,7 +363,7 @@ Module ExprReflection.
       lazymatch locals with
       | map.of_list ?bindings =>
         lazymatch val with
-        | word.of_Z ?z =>
+        | bits.of_Z _ ?z =>
           let z_bindings := zify_bindings bindings in
           let z_bindings := type_term z_bindings in
           let reified := expr_reify_Z z_bindings z in
@@ -381,7 +387,7 @@ Module ExprReflection.
     | [  |- WeakestPrecondition.dexpr _ _ _ ?val ] =>
       reify_change_dexpr_locals;
       lazymatch val with
-      | word.of_Z ?z => reify_change_dexpr_z
+      | bits.of_Z _ ?z => reify_change_dexpr_z
       | _ => reify_change_dexpr_w
       end
     | [  |- ?g ] => fail 0 g "is not a dexpr goal"
@@ -393,7 +399,7 @@ Module ExprReflection.
       eapply map.mapped_compat_of_list;
       lazymatch goal with
       | |- context[expr_Z_denotation] => (* LATER Use reification to speed up this rewrite *)
-        cbv [List.map fst snd er_T2w expr_Z_denotation]; rewrite ?word.of_Z_unsigned
+        cbv [List.map fst snd er_T2w expr_Z_denotation]; rewrite ?Zmod.of_Z_unsigned
       | _ => idtac
       end; reflexivity
       | .. ].
@@ -402,7 +408,7 @@ Module ExprReflection.
     lazymatch goal with
     | [ |- WP_nlet_eq ?v ] =>
       lazymatch type of v with
-      | word.rep       => simple apply compile_expr_w
+      | Zmod _         => simple apply compile_expr_w
       | bool              => simple apply compile_expr_bool
       | Init.Byte.byte => simple apply compile_expr_byte
       | nat              => simple apply compile_expr_nat
@@ -433,9 +439,10 @@ Ltac compile_assignment :=
   (* Higher priority than compilation lemmas for individual operations *)
 
 Section Tests.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
   Context {mem: map.map word Byte.byte} {locals: map.map String.string word}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
 
   Context (m: mem).
@@ -444,13 +451,13 @@ Section Tests.
     (WeakestPrecondition.dexpr (mem := mem) (locals := locals) map.empty m e x).
 
   Local Goal {e | forall z,
-          dexpr #{ "z" => word.of_Z z }# e
-                (word.of_Z (Z.land 3 z)) }.
+          dexpr #{ "z" => bits.of_Z width z }# e
+                (bits.of_Z width (Z.land 3 z)) }.
   Proof. eexists; intros; compile_expr. Qed.
 
   Local Goal {e | forall w,
           dexpr #{ "w" => w }# e
-                (word.and (word.of_Z 3) w) }.
+                (Zmod.and (bits.of_Z width 3) w) }.
   Proof. eexists; intros; compile_expr. Qed.
 
   Local Goal {e | forall b,
@@ -464,8 +471,8 @@ Section Tests.
   Proof. Fail eexists; intros; compile_expr. Abort. (* TODO *)
 
   Local Goal {e | forall x b,
-          dexpr #{ "x" => word.of_Z x; "b" => word_of_byte b }# e
-                (word.add (word.of_Z (Z.add x x))
+          dexpr #{ "x" => bits.of_Z width x; "b" => word_of_byte b }# e
+                (Zmod.add (bits.of_Z width (Z.add x x))
                           (word_of_byte (byte.and b b))) }.
   Proof. Fail eexists; intros; compile_expr. Abort. (* TODO *)
 End Tests.

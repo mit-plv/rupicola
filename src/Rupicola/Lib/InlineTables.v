@@ -18,10 +18,12 @@ Module InlineTable.
 End InlineTable.
 
 Section __.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -46,7 +48,7 @@ Section __.
           (n < List.length t)%nat ->
           (Z.of_nat (List.length t) <= 2 ^ width) ->
 
-          WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat n)) ->
+          WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat n)) ->
 
           (let v := v in
            <{ Trace := tr;
@@ -73,8 +75,8 @@ Section __.
       eapply WeakestPrecondition_dexpr_expr; eauto.
       eexists; split; eauto.
       unfold load, load_Z, load_bytes, map.getmany_of_tuple; simpl.
-      rewrite OfListWord.map.get_of_list_word.
-      rewrite word.add_0_r, word.unsigned_of_Z_nowrap, Nat2Z.id by lia.
+      rewrite (OfListWord.map.get_of_list_word width_pos).
+      rewrite Zmod.add_0_r, bits.unsigned_of_Z_small, Nat2Z.id by lia.
       rewrite nth_error_nth' with (d := cast default)
         by (rewrite map_length; lia).
       rewrite map_nth.
@@ -93,7 +95,7 @@ Section __.
       (n < List.length t)%nat ->
       (Z.of_nat (List.length t) <= 2 ^ width) ->
 
-      WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat n)) ->
+      WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat n)) ->
 
       (let v := v in
          <{ Trace := tr;
@@ -119,7 +121,7 @@ Section __.
   Qed.
 
   Definition word_to_bytes (z : word) : list byte:=
-    LittleEndianList.le_split (Z.to_nat (width / 8)) (word.unsigned z).
+    LittleEndianList.le_split (Z.to_nat (width / 8)) (Zmod.unsigned z).
 
   (* Turns a table of 32-bit words stored in Zs into
      a table of bytes *)
@@ -135,7 +137,7 @@ Section __.
 
   Lemma of_list_word_at_0 (xs : list byte)
     : OfListWord.map.of_list_word xs
-      = OfListWord.map.of_list_word_at (word.of_Z 0 : word) xs.
+      = OfListWord.map.of_list_word_at (bits.of_Z width 0) xs.
   Proof.
     unfold OfListWord.map.of_list_word_at.
     unfold MapKeys.map.map_keys.
@@ -146,12 +148,12 @@ Section __.
       rewrite <- seq_shift.
       rewrite map_map.
 
-      rewrite word.unsigned_of_Z_0.
+      rewrite Zmod.unsigned_0.
       cbn.
       rewrite map_fold_empty_id; [ reflexivity | ..].
       {
         intros.
-        rewrite word.ring_theory.(Radd_0_l).
+        rewrite Zmod.add_0_l.
         reflexivity.
       }
     }
@@ -177,8 +179,8 @@ Section __.
       b = (b1 ++ b2 ++ b3)%list ->
       n = Z.of_nat (length b1) ->
       width = 8* Z.of_nat (List.length b2) ->
-      load access_size.word (OfListWord.map.of_list_word (a ++ b)) (word.of_Z (Z.of_nat (length a) + n))
-      = load access_size.word (OfListWord.map.of_list_word b) (word.of_Z n : word).
+      load access_size.word (OfListWord.map.of_list_word (a ++ b)) (bits.of_Z width (Z.of_nat (length a) + n))
+      = load access_size.word (OfListWord.map.of_list_word b) (bits.of_Z width n).
   Proof.
     intros. subst b. subst n.
     assert (Z.of_nat (List.length (b1 ++ b2 ++ b3)) <= 2 ^ width).
@@ -192,28 +194,28 @@ Section __.
       try reflexivity;
       match goal with
         [|- ?P (OfListWord.map.of_list_word_at ?p ?xs)] =>
-         assert (array ptsto (word.of_Z 1) p xs
+         assert (array ptsto (bits.of_Z width 1) p xs
                        (OfListWord.map.of_list_word_at p xs)) as H1;
            [apply array1_iff_eq_of_list_word_at; cbv [sepclause_of_map]; eauto using mem_ok|
            generalize dependent (OfListWord.map.of_list_word_at p xs); intros]
       end.
     {
-      repeat seprewrite_in (@array_append width word) H1.
-      rewrite !word.ring_morph_mul in H1.
-      rewrite !word.of_Z_unsigned in H1.
-      rewrite !word.ring_theory.(Rmul_1_l) in H1.
-      rewrite <-!word.ring_morph_add in H1.
+      repeat seprewrite_in (@array_append width) H1.
+      rewrite !Zmod.of_Z_mul in H1.
+      rewrite !Zmod.of_Z_unsigned in H1.
+      rewrite !Zmod.mul_1_l in H1.
+      rewrite <-!Zmod.of_Z_add in H1.
       simpl in H1.
 
-      seprewrite_in (scalar_of_bytes (word.of_Z (Z.of_nat (length b1))) b2 H2) H1.
+      seprewrite_in (scalar_of_bytes (bits.of_Z width (Z.of_nat (length b1))) b2 H2) H1.
       ecancel_assumption.
     }
     {
       repeat seprewrite_in @array_append H1.
-      rewrite !word.ring_morph_mul in H1.
-      rewrite !word.of_Z_unsigned in H1.
-      rewrite !word.ring_theory.(Rmul_1_l) in H1.
-      rewrite <-!word.ring_morph_add in H1.
+      rewrite !Zmod.of_Z_mul in H1.
+      rewrite !Zmod.of_Z_unsigned in H1.
+      rewrite !Zmod.mul_1_l in H1.
+      rewrite <-!Zmod.of_Z_add in H1.
       simpl in H1.
 
       seprewrite_in scalar_of_bytes H1; auto.
@@ -238,7 +240,7 @@ Section __.
   Proof.
     rewrite length_word_to_bytes, Z2Nat.id.
     pose proof width_mod_8; apply Z_div_exact_2; lia.
-    pose proof word.width_pos; apply Z.div_pos; lia.
+    pose proof width_pos; apply Z.div_pos; lia.
   Qed.
 
   Lemma load_from_word_table t n d
@@ -246,7 +248,7 @@ Section __.
       (n < length t)%nat ->
       load access_size.word
            (OfListWord.map.of_list_word (to_byte_table t))
-           (word.of_Z (width/8 * Z.of_nat n))
+           (bits.of_Z width (width/8 * Z.of_nat n))
       = Some (nth n t d).
   Proof.
     intros table_bounds.
@@ -254,10 +256,10 @@ Section __.
     {
       rewrite Z.mul_0_r.
       rewrite of_list_word_at_0.
-      assert (array ptsto (word.of_Z 1) (word.of_Z 0)
+      assert (array ptsto (bits.of_Z width 1) (bits.of_Z width 0)
                     (word_to_bytes a ++ to_byte_table t)
                     (OfListWord.map.of_list_word_at
-                       (word.of_Z 0 : word)
+                       (bits.of_Z width 0)
                        (word_to_bytes a ++ to_byte_table t))).
       {
         eapply array1_iff_eq_of_list_word_at; cbv [sepclause_of_map]; auto using mem_ok.
@@ -266,13 +268,13 @@ Section __.
       seprewrite_in @scalar_of_bytes H0; auto.
       apply length_of_to_bytes.
       eapply load_word_of_sep.
-      assert ((LittleEndianList.le_combine (word_to_bytes a)) = word.unsigned a).
+      assert ((LittleEndianList.le_combine (word_to_bytes a)) = Zmod.unsigned a).
       {
         unfold word_to_bytes.
         rewrite LittleEndianList.le_combine_split, Z2Nat.id.
         {
           replace (width/8 *8) with width.
-          rewrite word.wrap_unsigned; auto.
+          rewrite bits.mod_to_Z; auto.
           pose proof width_mod_8.
           destruct width_cases as [H' | H']; rewrite H'; compute; auto.
         }
@@ -284,11 +286,11 @@ Section __.
       {
         simpl in *.
         match type of H0 with
-        | context [scalar _ ?e] =>
+        | context [scalar ?_a ?e] =>
           assert (e = a)
         end.
         {
-          rewrite <- word.of_Z_unsigned.
+          rewrite <- Zmod.of_Z_unsigned.
           f_equal.
           exact H1.
         }
@@ -301,7 +303,7 @@ Section __.
       replace (width/8 * Z.of_nat (S n)) with (width/8 + (width/8* Z.of_nat n)) by lia.
       unfold to_byte_table; simpl; fold to_byte_table.
       match goal with
-        [|- load _ _ (word.of_Z (?w + _)) = _ ] =>
+        [|- load _ _ (bits.of_Z width (?w + _)) = _ ] =>
         assert (w = Z.of_nat (List.length (word_to_bytes a)))
       end.
       {
@@ -369,7 +371,7 @@ Section __.
       (n < List.length t)%nat ->
       (Z.of_nat (List.length (to_byte_table t)) <= 2 ^ width) ->
 
-      WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat n)) ->
+      WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat n)) ->
 
       (let v := v in
          <{ Trace := tr;
@@ -395,7 +397,7 @@ Section __.
     exists v; split; repeat straightline; eauto.
     eapply WeakestPrecondition_dexpr_expr; eauto.
     eexists; split; eauto.
-    unfold v0; rewrite <- word.ring_morph_mul.
+    unfold v0; rewrite <- Zmod.of_Z_mul.
     apply load_from_word_table; auto.
   Qed.
 End __.

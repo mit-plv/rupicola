@@ -77,10 +77,12 @@ Arguments t : clear implicits.
 End ListArray.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {memT: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {memT: map.map word Byte.byte}.
   Context {localsT: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok memT}.
+  Context {mem_ok : map.ok memT}.
   Context {locals_ok : map.ok localsT}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -113,21 +115,21 @@ Section with_parameters.
           {| ai_size := asize;
              ai_type := word;
              ai_repr := scalar16;
-             ai_default := word.of_Z 0;
+             ai_default := Zmod.zero;
              ai_to_word v := v;
              ai_to_truncated_word v := truncate_word access_size.two v |}
       | access_size.four =>
           {| ai_size := asize;
              ai_type := word;
              ai_repr := scalar32;
-             ai_default := word.of_Z 0;
+             ai_default := Zmod.zero;
              ai_to_word v := v;
              ai_to_truncated_word v := truncate_word access_size.four v |}
       | access_size.word =>
           {| ai_size := access_size.word;
              ai_type := word;
              ai_repr := scalar;
-             ai_default := word.of_Z 0;
+             ai_default := Zmod.zero;
              ai_to_word v := v;
              ai_to_truncated_word v := v |}
       end.
@@ -153,9 +155,9 @@ Section with_parameters.
       (repr: word -> A -> memT -> Prop).
 
     Definition array_repr a_ptr a :=
-      (array ai.(ai_repr) (word.of_Z ai.(ai_width)) a_ptr (to_list a)).
+      (array ai.(ai_repr) (bits.of_Z width ai.(ai_width)) a_ptr (to_list a)).
 
-    Notation K_to_word x := (word.of_Z (Z.of_nat (K_to_nat x))).
+    Notation K_to_word x := (bits.of_Z width (Z.of_nat (K_to_nat x))).
 
     Context (a : A) (a_ptr : word) (a_expr : expr)
             (val: V) (val_expr : expr)
@@ -206,7 +208,7 @@ Section with_parameters.
         <{ pred (nlet_eq [var] v k) }>.
     Proof.
       cbn; intros Hlt *. clear put.
-      pose proof word.unsigned_range (K_to_word idx) as (Hge & _).
+      pose proof bits.unsigned_range (K_to_word idx) width_nonneg as (Hge & _).
       destruct (Hget a) as [default Hget0].
 
       exists (ai.(ai_to_truncated_word) (get a idx)); split; cbn; [ | assumption ].
@@ -225,8 +227,8 @@ Section with_parameters.
       { lia. }
 
       match goal with
-      | [ H: context[word.of_Z (_ * _)] |- _ ] =>
-        rewrite word.ring_morph_mul, !word.of_Z_unsigned in H by assumption
+      | [ H: context[bits.of_Z width (_ * _)] |- _ ] =>
+        rewrite Zmod.of_Z_mul, !Zmod.of_Z_unsigned in H by assumption
       end.
 
       rewrite Hget0.
@@ -336,7 +338,7 @@ Section with_parameters.
       pose proof compile_array_put_length as Hputlen.
       pose proof compile_array_put_firstn as Hputfst.
       pose proof compile_array_put_skipn as Hputskp.
-      pose proof word.unsigned_range (K_to_word idx) as (Hge & _).
+      pose proof bits.unsigned_range (K_to_word idx) width_nonneg as (Hge & _).
       destruct (Hget (put a idx val)) as [default Hget0].
       eexists; split; cbn.
 
@@ -355,8 +357,8 @@ Section with_parameters.
           { assumption. }
 
           match goal with
-          | [ H: context[word.of_Z (_ * _)] |- _ ] =>
-            rewrite word.ring_morph_mul, !word.of_Z_unsigned in H by assumption
+          | [ H: context[bits.of_Z width (_ * _)] |- _ ] =>
+            rewrite Zmod.of_Z_mul, !Zmod.of_Z_unsigned in H by assumption
           end.
 
           destruct sz;
@@ -374,7 +376,7 @@ Section with_parameters.
                                 _ _ (K_to_nat idx));
             [ apply Hputlen; assumption | ].
           all: rewrite <- Hget0, Hgetput, !Hputfst, !Hputskp by assumption.
-          all: repeat rewrite word.ring_morph_mul, !word.of_Z_unsigned by lia.
+          all: repeat rewrite Zmod.of_Z_mul, !Zmod.of_Z_unsigned by lia.
 
           1: rewrite to_byte_of_byte_nowrap in Hm.
           all: try ecancel_assumption.
@@ -391,7 +393,7 @@ Section with_parameters.
 
     Notation to_list := Vector.to_list.
     Notation K_to_nat idx := (cast (proj1_sig (P:=fun idx0 : K => (cast idx0 < _)%nat) idx)).
-    Notation K_to_word x := (word.of_Z (Z.of_nat (K_to_nat x))).
+    Notation K_to_word x := (bits.of_Z width (Z.of_nat (K_to_nat x))).
 
     Notation get a idx := (VectorArray.get a (proj1_sig idx) (proj2_sig idx)).
     Notation put a idx v := (VectorArray.put a (proj1_sig idx) (proj2_sig idx) v).
@@ -399,7 +401,7 @@ Section with_parameters.
     Definition vectorarray_value {n}
                (addr: word) (a: VectorArray.t ai.(ai_type) n)
       : memT -> Prop :=
-      array ai.(ai_repr) (word.of_Z ai.(ai_width)) addr (to_list a).
+      array ai.(ai_repr) (bits.of_Z width ai.(ai_width)) addr (to_list a).
     Notation repr := vectorarray_value.
 
     Lemma VectorArray_Hget {n}:
@@ -452,7 +454,7 @@ Section with_parameters.
 
         sep (vectorarray_value a_ptr a) R mem ->
         WeakestPrecondition.dexpr mem locals a_expr a_ptr ->
-        WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat (cast idx))) ->
+        WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat (cast idx))) ->
 
         (let v := v in
          <{ Trace := tr;
@@ -491,7 +493,7 @@ Section with_parameters.
 
         sep (vectorarray_value a_ptr a) R mem ->
         WeakestPrecondition.dexpr mem locals a_expr a_ptr ->
-        WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat (cast idx))) ->
+        WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat (cast idx))) ->
         WeakestPrecondition.dexpr mem locals val_expr (ai.(ai_to_word) val) ->
 
         (let v := v in
@@ -539,7 +541,7 @@ Section with_parameters.
 
     Notation to_list x := x (only parsing).
     Notation K_to_nat idx := (@cast _ _ ConvNat idx).
-    Notation K_to_word x := (word.of_Z (Z.of_nat (K_to_nat x))).
+    Notation K_to_word x := (bits.of_Z width (Z.of_nat (K_to_nat x))).
 
     Notation get a idx := (ListArray.get a idx).
     Notation put a idx v := (ListArray.put a idx v).
@@ -547,7 +549,7 @@ Section with_parameters.
     Definition listarray_value
                (addr: word) (a: ListArray.t ai.(ai_type))
       : memT -> Prop :=
-      array ai.(ai_repr) (word.of_Z ai.(ai_width)) addr a.
+      array ai.(ai_repr) (bits.of_Z width ai.(ai_width)) addr a.
     Notation repr := listarray_value.
 
     Lemma ListArray_Hget:
@@ -596,7 +598,7 @@ Section with_parameters.
 
         sep (listarray_value a_ptr a) R mem ->
         WeakestPrecondition.dexpr mem locals a_expr a_ptr ->
-        WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat (cast idx))) ->
+        WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat (cast idx))) ->
 
         Z.of_nat (cast idx) < Z.of_nat (Datatypes.length a) ->
 
@@ -633,7 +635,7 @@ Section with_parameters.
 
         sep (listarray_value a_ptr a) R mem ->
         WeakestPrecondition.dexpr mem locals a_expr a_ptr ->
-        WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat (cast idx))) ->
+        WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat (cast idx))) ->
         WeakestPrecondition.dexpr mem locals val_expr (ai.(ai_to_word) val) ->
 
         Z.of_nat (K_to_nat idx) < Z.of_nat (List.length a) ->
@@ -663,7 +665,7 @@ Section with_parameters.
       eapply (compile_array_put sz id (fun x => K_to_nat x));
         eauto using ListArray_Hget, ListArray_Hput,
         ListArray_Hgetput, ListArray_Hrw.
-      unfold id; pose proof word.unsigned_range (K_to_word idx).
+      unfold id; pose proof bits.unsigned_range (K_to_word idx) width_nonneg.
       lia.
     Qed.
 
@@ -709,7 +711,7 @@ Section with_parameters.
 
     Notation to_list x := x (only parsing).
     Notation K_to_nat idx := (@cast _ _ ConvNat idx).
-    Notation K_to_word x := (word.of_Z (Z.of_nat (K_to_nat x))).
+    Notation K_to_word x := (bits.of_Z width (Z.of_nat (K_to_nat x))).
 
     Notation get a idx := (ListArray.get a idx).
     Notation put a idx v := (ListArray.put a idx v).
@@ -783,7 +785,7 @@ Section with_parameters.
 
         sep (sizedlistarray_value len a_ptr a) R mem ->
         WeakestPrecondition.dexpr mem locals a_expr a_ptr ->
-        WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat (cast idx))) ->
+        WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat (cast idx))) ->
 
         Z.of_nat (cast idx) < Z.of_nat len ->
 
@@ -825,7 +827,7 @@ Section with_parameters.
 
         sep (sizedlistarray_value len a_ptr a) R mem ->
         WeakestPrecondition.dexpr mem locals a_expr a_ptr ->
-        WeakestPrecondition.dexpr mem locals idx_expr (word.of_Z (Z.of_nat (cast idx))) ->
+        WeakestPrecondition.dexpr mem locals idx_expr (bits.of_Z width (Z.of_nat (cast idx))) ->
         WeakestPrecondition.dexpr mem locals val_expr (ai.(ai_to_word) val) ->
 
         Z.of_nat (cast idx) < Z.of_nat len ->
@@ -950,7 +952,7 @@ Section with_parameters.
     prepare_array_lemma (@compile_listarray_scalar_fold_left) access_size.word.
 End with_parameters.
 
-Arguments sizedlistarray_value {width word memT} sz len addr a _ : assert.
+Arguments sizedlistarray_value {width memT} sz len addr a _ : assert.
 Arguments Arrays._access_info /.
 Arguments Arrays.ai_width /.
 
@@ -970,7 +972,7 @@ Ltac compile_map :=
       lazymatch v with
       | (ListArray.map (V := Init.Byte.byte) _ ?l) =>
           _compile_map locals (Z.of_nat (List.length l)) compile_byte_listarray_map
-      | (ListArray.map (V := @word.rep _ _) _ ?l) =>
+      | (ListArray.map (V := Zmod _) _ ?l) =>
           _compile_map locals (Z.of_nat (List.length l)) compile_word_listarray_map
       end
   end.
@@ -991,7 +993,7 @@ Ltac compile_fold_left :=
           _compile_scalar_fold_left
             locals (Z.of_nat (List.length l))
             compile_byte_listarray_scalar_fold_left
-      | (ListArray.fold_left (V := @word.rep _ _) _ ?l _) =>
+      | (ListArray.fold_left (V := Zmod _) _ ?l _) =>
           _compile_scalar_fold_left
             locals (Z.of_nat (List.length l))
             compile_word_listarray_scalar_fold_left

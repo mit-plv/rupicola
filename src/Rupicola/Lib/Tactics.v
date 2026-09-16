@@ -3,13 +3,13 @@ Require Import Rupicola.Lib.Core.
 Ltac boolean_cleanup :=
   repeat match goal with
          | H : _ |- _ =>
-           rewrite word.unsigned_of_Z_0 in H
+           rewrite Zmod.unsigned_0 in H
          | H : _ |- _ =>
-           rewrite word.unsigned_of_Z_1 in H
-         | H : ?x = word.of_Z 0%Z |- _ => subst x
-         | H : ?x = word.of_Z 1%Z |- _ => subst x
-         | x := word.of_Z 0%Z |- _ => subst x
-         | x := word.of_Z 1%Z |- _ => subst x
+           rewrite (bits.unsigned_1 width_ge_1) in H
+         | H : ?x = Zmod.zero%Z |- _ => subst x
+         | H : ?x = Zmod.one%Z |- _ => subst x
+         | x := Zmod.zero%Z |- _ => subst x
+         | x := Zmod.one%Z |- _ => subst x
          | _ => congruence
          end.
 
@@ -181,7 +181,7 @@ Ltac straightline_map_solver :=
   | |- @map.get ?K ?V ?M _ ?k = Some ?e' =>
     let e := rdelta.rdelta e' in
     is_evar e;
-    (constr_eq K string; match V with word.rep => idtac end;
+    (constr_eq K string; match V with Zmod _ => idtac end;
      once (let v :=
                multimatch goal with
                  x := context[@map.put _ _ M _ k ?v] |- _ => v end in
@@ -193,7 +193,7 @@ Ltac straightline_map_solver :=
   | |- @map.get ?K ?V ?M _ ?k = Some ?e' =>
     let e := rdelta.rdelta e' in
     is_evar e;
-    (constr_eq K string; match V with word.rep => idtac end;
+    (constr_eq K string; match V with Zmod _ => idtac end;
      once (let v :=
                multimatch goal with
                | H : @map.get _ _ M _ k = Some ?v |- _ => v end in
