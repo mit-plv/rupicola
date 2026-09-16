@@ -7,10 +7,12 @@ Section Gallina.
 End Gallina.
 
 Section Compile.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -25,7 +27,7 @@ Section Compile.
       R (Data : word -> A -> _ -> Prop)
       swap_var x_var x_ptr y_var y_ptr tmp,
 
-      map.get locals swap_var = Some (word.of_Z (Z.b2z swap)) ->
+      map.get locals swap_var = Some (bits.of_Z width (Z.b2z swap)) ->
       map.get locals x_var = Some x_ptr ->
       map.get locals y_var = Some y_ptr ->
 
@@ -111,10 +113,12 @@ Section Compile.
 End Compile.
 
 Section Helpers.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 

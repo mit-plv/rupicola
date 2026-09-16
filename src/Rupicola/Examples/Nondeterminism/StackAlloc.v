@@ -5,10 +5,12 @@ Require Import Rupicola.Examples.Nondeterminism.NonDeterminism.
 Require Import coqutil.Byte.
 
 Section Alloc.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -80,15 +82,15 @@ Section Alloc.
     let/n idx := 0%nat in
     let/n undef := ListArray.get bs idx in
     let/n out := w in
-    let/n out := word.xor (word_of_byte undef) out in
-    let/n out := word.xor (word_of_byte undef) out in
+    let/n out := Zmod.xor (word_of_byte undef) out in
+    let/n out := Zmod.xor (word_of_byte undef) out in
     mret out.
 
   Lemma nondef_xor_id w w' : nondet_xor_src w w' -> w = w'.
   Proof.
     intros (bs & Hlen & ->).
-    apply word.unsigned_inj. unfold byte.unsigned.
-    rewrite !word.unsigned_xor_nowrap, !word.unsigned_of_Z.
+    apply Zmod.unsigned_inj. unfold byte.unsigned.
+    rewrite !bits.unsigned_xor, !bits.unsigned_of_Z.
     rewrite <- Z.lxor_assoc, Z.lxor_nilpotent, Z.lxor_0_l; reflexivity.
   Qed.
 
@@ -117,4 +119,4 @@ Section Alloc.
 End Alloc.
 
 From bedrock2 Require Import BasicC64Semantics NotationsCustomEntry.
-Compute nondet_xor_br2fn (word := word).
+Compute nondet_xor_br2fn (width := 64).

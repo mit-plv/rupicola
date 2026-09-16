@@ -7,42 +7,44 @@ Require Import
         Rupicola.Examples.CRC32.Table.
 
 (* Require Import bedrock2.Semantics. *)
-(* Require Import coqutil.Word.Interface coqutil.Byte. *)
+(* Require Import coqutil.Word.Bitwidth coqutil.Byte. *)
 
 Section __.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Definition crc_table : list word :=
-    List.map word.of_Z crc_table_Z.
+    List.map (Zmod.of_Z (2 ^ width)) crc_table_Z.
 
   Program Definition crc32 (data : list byte) (*32bit or larger*) :=
-    let/n crc32 := word.of_Z 0xFFFFFFFF in
+    let/n crc32 := bits.of_Z width 0xFFFFFFFF in
     let/n crc32 :=
-      ranged_for_u (word_ok := word_ok)
-        (word.of_Z 0)
-        (word.of_Z (Z.of_nat (length data)))
+      ranged_for_u
+        Zmod.zero
+        (bits.of_Z width (Z.of_nat (length data)))
         (fun crc32 tok idx _ =>
            let/n b := (ListArray.get (data : ListArray.t byte) idx) in
            let/n nLookupIndex :=
-             word.and (word.xor crc32 (word_of_byte b))
-                      (word.of_Z 0xFF) in
+             Zmod.and (Zmod.xor crc32 (word_of_byte b))
+                      (bits.of_Z width 0xFF) in
            let/n nLookupRes := InlineTable.get crc_table nLookupIndex in
-           let/n crc32 := word.sru crc32 (word.of_Z 8) in
-           let/n crc32 := word.xor crc32 nLookupRes in
+           let/n crc32 := Semantics.sru crc32 8 in
+           let/n crc32 := Zmod.xor crc32 nLookupRes in
            (tok, crc32))
         crc32 in
-    let/n crc32 := word.xor crc32 (word.of_Z 0xFFFFFFFF) in
+    let/n crc32 := Zmod.xor crc32 (bits.of_Z width 0xFFFFFFFF) in
     crc32.
 
   Lemma idx_in_bounds (w: word) :
-    (Z.to_nat (word.unsigned (word.and w (word.of_Z 255))) < 256)%nat.
+    (Z.to_nat (Zmod.unsigned (Zmod.and w (bits.of_Z width 255))) < 256)%nat.
   Proof.
-    pose proof word.unsigned_range (word.and w (word.of_Z 255)).
+    pose proof bits.unsigned_range (Zmod.and w (bits.of_Z width 255)) width_nonneg.
     apply (Z2Nat.inj_lt _ 256); [lia..|].
     eapply Z.le_lt_trans; [apply word.and_leq_right|].
     eapply Z.le_lt_trans; [apply word.unsigned_of_Z_le|].
@@ -59,7 +61,7 @@ Section __.
   Instance spec_of_crc32 : spec_of "crc32" :=
     fnspec! "crc32" data_ptr len / (data : list byte) R ~> r,
     { requires tr mem :=
-        (len = word.of_Z (Z.of_nat (length data)) /\
+        (len = bits.of_Z width (Z.of_nat (length data)) /\
         (listarray_value AccessByte data_ptr data * R)%sep mem);
       ensures tr' mem' :=
         tr' = tr /\
@@ -71,8 +73,8 @@ Section __.
 
   Hint Resolve idx_in_bounds length_representable : compiler_side_conditions.
 
-  Hint Rewrite word.unsigned_of_Z : compiler_side_conditions.
-  Hint Extern 1 (_ < Z.of_nat ?n) => (pose proof word.wrap_of_nat_le n; lia)
+  Hint Rewrite bits.unsigned_of_Z : compiler_side_conditions.
+  Hint Extern 1 (_ < Z.of_nat ?n) => (pose proof Z.mod_le (Z.of_nat n) (2 ^ width) (Nat2Z.is_nonneg n) modulus_pos; lia)
          : compiler_side_conditions.
 
   Derive crc32_br2fn SuchThat
@@ -84,6 +86,5 @@ Section __.
   Qed.
 End __.
 
-Require Import coqutil.Word.Naive.
 Definition crc32_cbytes := Eval vm_compute in
-  list_byte_of_string (ToCString.c_module [("crc32", crc32_br2fn (word:=word64))]).
+  list_byte_of_string (ToCString.c_module [("crc32", crc32_br2fn (width := 64))]).

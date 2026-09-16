@@ -1,17 +1,19 @@
 Require Import Rupicola.Lib.Api.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   Definition example (x: word) (y: word) :=
-    let/n x := word.and (word.add y (word.of_Z 1))
-                       (word.xor (word.add (word.sub x y) x)
-                                 (word.of_Z 0)) in
+    let/n x := Zmod.and (Zmod.add y Zmod.one)
+                       (Zmod.xor (Zmod.add (Zmod.sub x y) x)
+                                 Zmod.zero) in
     x.
 
   Implicit Type R : mem -> Prop.
@@ -53,7 +55,7 @@ Section with_parameters.
       ensures tr' mem' :=
         tr = tr' /\
         mem = mem' /\
-        z = word.of_Z (exZ (word.unsigned x) (word.unsigned y)) }.
+        z = bits.of_Z width (exZ (Zmod.unsigned x) (Zmod.unsigned y)) }.
 
   Derive exZ_br2fn SuchThat
          (defn! "exZ"("x", "y") ~> "x"
@@ -69,13 +71,13 @@ Section with_parameters.
   Fixpoint overwrite_chain (n: nat) (w0 w1: word) :=
     match n with
     | O => w1
-    | S n => let/n w1 := word.add w0 w1 in
+    | S n => let/n w1 := Zmod.add w0 w1 in
             overwrite_chain n w0 w1
     end.
 
   Definition chain (w0: word) :=
     Eval simpl in
-    let/n w1 := word.of_Z 1 in
+    let/n w1 := Zmod.one in
     overwrite_chain 5 w0 w1.
 
   Instance spec_of_chain : spec_of "chain" :=

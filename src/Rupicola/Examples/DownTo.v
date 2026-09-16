@@ -3,27 +3,29 @@ Require Import Rupicola.Lib.Arrays.
 Require Import Rupicola.Lib.ControlFlow.DownTo.
 
 Section Gallina.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
 
   Definition popcount (w: word) :=
     (* This code is here to demonstrate Rupicola features, not for speed (!) *)
     let/n ones := 0 in
     let/n (w, ones) := downto \< w, ones \> 64 (fun w_ones _ =>
       let '\< w, ones \> := w_ones in
-      let/n ones := if word.eqb (word.and w (word.of_Z 1))
-                               (word.of_Z 1)
+      let/n ones := if Zmod.eqb (Zmod.and w Zmod.one)
+                               Zmod.one
                    then ones + 1 else ones in
-      let/n w := word.sru w (word.of_Z 1) in
+      let/n w := Semantics.sru w 1 in
       \< w, ones \>) in
     ones.
 End Gallina.
 
 Section Compilation.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
   Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -32,7 +34,7 @@ Section Compilation.
     { requires tr mem :=
         R mem;
       ensures tr' mem' :=
-        tr' = tr /\ R mem' /\ c = word.of_Z (popcount w) }.
+        tr' = tr /\ R mem' /\ c = bits.of_Z width (popcount w) }.
 
   Import DownToCompiler.
 
@@ -43,7 +45,7 @@ Section Compilation.
 
   Derive popcount_br2fn SuchThat
          (defn! "popcount"("w") ~> "ones" { popcount_br2fn },
-          implements (popcount (word := word)))
+          implements (popcount (width := width)))
          As popcount_correct.
   Proof.
     compile.

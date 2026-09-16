@@ -20,20 +20,22 @@ Notation "'let/o'  x  :=  val  'goto_fail' default 'in'  body" :=
   exact (RupicolaBinding A []) : typeclass_instances.
 
 Section KVSwap.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Context {ops} {key value : Type} {Value}
           {dummy_value : value}
           {kvp : kv_parameters}
-          {ok : @kv_parameters_ok _ BW _ mem ops key value Value kvp}.
+          {ok : @kv_parameters_ok _ BW mem ops key value Value kvp}.
 
   Existing Instances ops kvp ok.
   Existing Instances map_ok annotated_map_ok key_eq_dec.
-  Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _ _) : typeclass_instances. (* COQBUG(14707) *)
+  Local Hint Extern 1 (spec_of "get") => unshelve simple refine (@spec_of_map_get _ _ _ _ _ _ _ _ _ _) : typeclass_instances. (* COQBUG(14707) *)
 
   (* MAP LAYOUTS
 
@@ -271,7 +273,7 @@ Section KVSwap.
           (AnnotatedMap m_ptr M * Key k_ptr k * R)%sep mem' ->
           <{ Trace := tr;
              Memory := mem';
-             Locals := map.put (map.put locals err (word.of_Z 1)) var garbage;
+             Locals := map.put (map.put locals err Zmod.one) var garbage;
              Functions := functions }>
           default_impl
           <{ pred default }>) ->
@@ -281,7 +283,7 @@ Section KVSwap.
            * Key k_ptr k * R)%sep mem' ->
           <{ Trace := tr;
              Memory := mem';
-             Locals := map.put (map.put locals err (word.of_Z 0)) var hd_ptr;
+             Locals := map.put (map.put locals err Zmod.zero) var hd_ptr;
              Functions := functions }>
           K_impl
           <{ pred (K head) }>) ->
@@ -320,7 +322,7 @@ Section KVSwap.
       end.
       erewrite get_deannotate_Some by eassumption.
       cbn [do_or_default].
-      exists (word.of_Z 1).
+      exists Zmod.one.
       split.
       { eexists.
         split.
@@ -330,8 +332,8 @@ Section KVSwap.
                  WeakestPrecondition.expr_body
                  WeakestPrecondition.literal
                  Semantics.interp_binop dlet.dlet].
-          rewrite word.eqb_eq; reflexivity. } }
-      { rewrite word.unsigned_of_Z_1.
+          rewrite Zmod.eqb_refl; reflexivity. } }
+      { rewrite (bits.unsigned_1 width_ge_1).
         split; try congruence; [ ]. intros.
         cbn [fst snd].
         match goal with
@@ -347,7 +349,7 @@ Section KVSwap.
       end.
       erewrite get_deannotate_None by eassumption.
       cbn [do_or_default].
-      exists (word.of_Z 0).
+      exists Zmod.zero.
       split.
       { eexists.
         split.
@@ -357,8 +359,8 @@ Section KVSwap.
                  WeakestPrecondition.expr_body
                  WeakestPrecondition.literal
                  Semantics.interp_binop dlet.dlet].
-          destr (@word.eqb _ word (word.of_Z 1) (word.of_Z 0)); congruence. } }
-      { rewrite word.unsigned_of_Z_0.
+          rewrite Zmod.of_Z_0, word.eqb_ne by apply bits.one_neq_zero, width_ge_1; reflexivity. } }
+      { rewrite Zmod.unsigned_0.
         split; try congruence; [ ]. intros.
         cbn [fst snd].
         match goal with
@@ -379,26 +381,26 @@ Section KVSwap.
           (fun tr' mem' rets =>
              tr = tr'
              /\ length rets = 2%nat
-             /\ let was_overwrite := hd (word.of_Z 0) rets in
-               let old_ptr := hd (word.of_Z 0) (tl rets) in
+             /\ let was_overwrite := hd Zmod.zero rets in
+               let old_ptr := hd Zmod.zero (tl rets) in
                match map.get m k with
                | Some (a, old_v) =>
                  match a with
                  | Borrowed _ => True (* no guarantees *)
                  | Reserved pv' =>
-                   was_overwrite = word.of_Z 1
+                   was_overwrite = Zmod.one
                    /\ old_ptr = pv'
                    /\ (AnnotatedMap pm (map.put m k (Reserved pv, v))
                       * Key pk k * Value old_ptr old_v * R)%sep mem'
                  | Owned =>
-                   was_overwrite = word.of_Z 1
+                   was_overwrite = Zmod.one
                    /\ (AnnotatedMap pm (map.put m k (Owned, v))
                       * Key pk k * Value old_ptr old_v * R)%sep mem'
                  end
                | None =>
                  (* if there was no previous value, the map consumes both
                      the key and value memory *)
-                 was_overwrite = word.of_Z 0
+                 was_overwrite = Zmod.zero
                  /\ (AnnotatedMap pm (map.put m k (Owned, v))
                     * R)%sep mem'
                end).

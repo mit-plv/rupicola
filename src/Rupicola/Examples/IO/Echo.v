@@ -2,10 +2,12 @@ Require Import Rupicola.Lib.Api Rupicola.Lib.Monads.
 Require Import Rupicola.Examples.IO.IO.
 
 Section Echo.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -135,7 +137,7 @@ Section Echo.
   Definition io_sum : IO unit :=
     let/! w1 := call! IO.Read in
     let/! w2 := call! IO.Read in
-    let/n sum := word.add w1 w2 in
+    let/n sum := Zmod.add w1 w2 in
     let/! _ := call! IO.Write sum in
     mret tt.
 
@@ -152,10 +154,10 @@ Section Echo.
 
   Definition io_check expected : IO Z :=
     let/! read := call! IO.Read in
-    let/! err := if word.eqb (word := word) read expected
-                then let/! _ := call! IO.Write (word.of_Z 0) in
+    let/! err := if Zmod.eqb read expected
+                then let/! _ := call! IO.Write Zmod.zero in
                      mret 0
-                else let/! _ := call! IO.Write (word.of_Z 42) in
+                else let/! _ := call! IO.Write (bits.of_Z width 42) in
                      mret 42 in
     let/n err := err + 1 in
     mret err.
@@ -163,7 +165,7 @@ Section Echo.
   Instance spec_of_io_check : spec_of "io_check" :=
     fnspec! "io_check" expected / (R: mem -> Prop),
     { requires tr mem := R mem;
-      ensures tr' mem' rets := iospec tr tr' (io_check expected) (fun val => rets = [word.of_Z val] /\ R mem') }.
+      ensures tr' mem' rets := iospec tr tr' (io_check expected) (fun val => rets = [bits.of_Z width val] /\ R mem') }.
 
   Derive io_check_br2fn SuchThat
          (defn! "io_check"("expected") ~> "err" { io_check_br2fn },
@@ -176,8 +178,8 @@ End Echo.
 
 (*
 From bedrock2 Require Import BasicC64Semantics NotationsCustomEntry.
-Compute io_sum_br2fn. (* (word := word) *)
-Compute ToCString.c_func ("io_echo", io_echo_br2fn).
+Compute io_sum_br2fn (width := 64). (* *)
+Compute ToCString.c_func ("io_echo", io_echo_br2fn (width := 64)).
 Compute ToCString.c_func ("io_sum", io_sum_br2fn).
-Compute ToCString.c_func ("io_check", (io_check_br2fn (word := word))).
+Compute ToCString.c_func ("io_check", (io_check_br2fn)).
 *)

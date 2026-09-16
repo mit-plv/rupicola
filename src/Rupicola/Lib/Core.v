@@ -9,7 +9,7 @@ From bedrock2 Require Export
 From coqutil Require Export
      Macros.WithBaseName dlet Byte Datatypes.List
      Z.PushPullMod Tactics.Tactics Tactics.letexists
-     Word.Interface Word.Properties Word.Bitwidth
+     Word.Properties Word.Bitwidth
      Map.Interface Map.Properties Map.SortedList.
 From coqutil Require Import
      Decidable.
@@ -471,354 +471,239 @@ Qed.
 
 Import List.
 
+Lemma width_ge_1 {width} {BW: Bitwidth width} : 1 <= width.
+Proof. pose proof width_pos; lia. Qed.
+
 (* TODO: should be upstreamed to coqutil *)
 Module word.
   Section __.
-    Context {width} {word : Interface.word width} {ok : word.ok word}.
+    Context {width} {BW: Bitwidth width}.
+    Local Notation word := (bits width).
 
-    Lemma wrap_small x :
-      0 <= x < 2 ^ width ->
-      word.wrap x = x.
-    Proof. apply Z.mod_small. Qed.
-
-    Lemma wrap_le z:
-      0 <= z -> word.wrap z <= z.
+    Lemma smodulo_range z:
+      - 2 ^ (width - 1) <= Z.smodulo z (2 ^ width) < 2 ^ (width - 1).
     Proof.
-      pose proof word.width_pos.
-      intros; apply Z.mod_le; [|apply Z.pow_pos_nonneg]; lia.
+      rewrite word.smodulo_pow2; set (z + _) as z0.
+      pose proof Z.mod_pos_bound z0 (2 ^ width) modulus_pos as h.
+      rewrite (word.pow2_width_minus1 width_pos) in h at 3; lia.
     Qed.
 
-    Lemma wrap_of_nat_le n:
-      word.wrap (Z.of_nat n) <= Z.of_nat n.
-    Proof. apply wrap_le; lia. Qed.
-
-    Lemma wrap_range z:
-      0 <= word.wrap z < 2 ^ width.
-    Proof. apply Z.mod_pos_bound, word.modulus_pos. Qed.
-
-    Lemma swrap_range z:
-      - 2 ^ (width - 1) <= word.swrap (word := word) z < 2 ^ (width - 1).
-    Proof.
-      unfold word.swrap; set (z + _) as z0.
-      pose proof Z.mod_pos_bound z0 (2 ^ width) word.modulus_pos as h.
-      rewrite word.pow2_width_minus1 in h at 3; lia.
-    Qed.
-
-    Lemma wrap_idempotent z:
-      word.wrap (word.wrap z) = word.wrap z.
-    Proof. apply wrap_small, wrap_range. Qed.
-
-    Lemma swrap_idempotent z:
-      word.swrap (word := word) (word.swrap (word := word) z) = word.swrap (word := word) z.
-    Proof. apply word.swrap_inrange, swrap_range. Qed.
-
-    Lemma of_Z_wrap z:
-      word.of_Z (word := word) z = word.of_Z (word.wrap z).
-    Proof. apply word.unsigned_inj; rewrite !word.unsigned_of_Z, wrap_idempotent; reflexivity. Qed.
-
-    Lemma of_Z_swrap z:
-      word.of_Z (word := word) z = word.of_Z (word.swrap (word := word) z).
-    Proof. apply word.signed_inj; rewrite !word.signed_of_Z, swrap_idempotent; reflexivity. Qed.
-
-    Lemma of_Z_mod z:
-      word.of_Z (word := word) z = word.of_Z (z mod 2 ^ width).
-    Proof. apply of_Z_wrap. Qed.
-
-    Lemma unsigned_of_Z_b2z b :
-      @word.unsigned _ word (word.of_Z (Z.b2z b)) = Z.b2z b.
-    Proof.
-      destruct b; cbn [Z.b2z];
-        auto using word.unsigned_of_Z_0, word.unsigned_of_Z_1.
-    Qed.
+    Lemma of_Z_smodulo z:
+      bits.of_Z width z = bits.of_Z width (Z.smodulo z (2 ^ width)).
+    Proof. apply Zmod.signed_inj; rewrite !bits.signed_of_Z, Z.smod_smod; reflexivity. Qed.
 
     Lemma unsigned_of_Z_le (z: Z):
       0 <= z ->
-      word.unsigned (word := word) (word.of_Z z) <= z.
-    Proof.
-      rewrite word.unsigned_of_Z; apply wrap_le.
-    Qed.
+      Zmod.unsigned (bits.of_Z width z) <= z.
+    Proof. rewrite bits.unsigned_of_Z; intros; apply Z.mod_le, modulus_pos; lia. Qed.
 
     Lemma and_leq_right (a b : word)
-      : (word.unsigned (word.and a b)) <= (word.unsigned b).
+      : (Zmod.unsigned (Zmod.and a b)) <= (Zmod.unsigned b).
     Proof.
-      rewrite word.unsigned_and_nowrap.
+      rewrite bits.unsigned_and.
       apply Z_land_leq_right.
-      all: apply word.unsigned_range.
-    Qed.
-
-    Lemma word_to_nat_to_word (w : word) :
-      w = word.of_Z (Z.of_nat (Z.to_nat (word.unsigned w))).
-    Proof.
-      rewrite Z2Nat.id by apply word.unsigned_range.
-      rewrite word.of_Z_unsigned; reflexivity.
-    Qed.
-
-    Lemma swrap_eq z :
-      @word.swrap width _ z = z ->
-      - 2 ^ (width - 1) <= z < 2 ^ (width - 1).
-    Proof.
-      unfold word.swrap; intros H.
-      pose proof word.half_modulus_pos.
-      apply (Z.add_cancel_r _ _ (2 ^ (width - 1))) in H.
-      ring_simplify in H.
-      apply Z.mod_small_iff in H.
-      + destruct H as [ H | H ]; rewrite (word.pow2_width_minus1 (word := word)) in H; lia.
-      + rewrite word.pow2_width_minus1; lia.
+      all: apply (bits.unsigned_range _ width_nonneg).
     Qed.
 
     Implicit Types w : word.
 
-    Lemma signed_unsigned_dec w :
-      word.signed w =
-      if Z_lt_le_dec (word.unsigned w) (2 ^ (width - 1))
-      then word.unsigned w
-      else word.unsigned w - 2 ^ width.
-    Proof.
-      rewrite word.signed_eq_swrap_unsigned.
-      pose proof word.unsigned_range w.
-      destruct Z_lt_le_dec.
-      - apply word.swrap_inrange; lia.
-      - unfold word.swrap.
-        rewrite (word.pow2_width_minus1 (word := word)) in *.
-        pose proof word.half_modulus_pos.
-        rewrite <- Z_mod_plus_full with (b := -1).
-        rewrite Z.mod_small; [ | split ]; lia.
-    Qed.
-
-    Lemma signed_gz_unsigned_bounds w :
-      0 <= word.signed w <->
-      word.unsigned w < 2 ^ (width - 1).
-    Proof.
-      split; intro H; pose proof word.unsigned_range w.
-      - rewrite signed_unsigned_dec in H.
-        destruct Z_lt_le_dec in H.
-        + assumption.
-        + exfalso; lia.
-      - rewrite word.signed_eq_swrap_unsigned, word.swrap_inrange; lia.
-    Qed.
-
-    Lemma signed_lt_unsigned (w : word):
-      word.signed w <= word.unsigned w.
-    Proof.
-      pose proof word.unsigned_range w.
-      rewrite signed_unsigned_dec.
-      destruct Z_lt_le_dec; lia.
-    Qed.
-
     Lemma signed_gz_eq_unsigned w :
-      0 <= word.signed w ->
-      word.unsigned w = word.signed w.
+      0 <= Zmod.signed w ->
+      Zmod.unsigned w = Zmod.signed w.
     Proof.
-      intros Hgz.
-      rewrite word.signed_eq_swrap_unsigned, word.swrap_inrange.
-      - reflexivity.
-      - pose proof word.unsigned_range w.
-        apply signed_gz_unsigned_bounds in Hgz.
-        lia.
+      rewrite (bits.signed_nonneg_iff _ width_nonneg); intros.
+      symmetry; apply bits.signed_small; pose proof bits.unsigned_range w width_nonneg; lia.
     Qed.
 
     Lemma of_nat_to_nat_unsigned w:
-      Z.of_nat (Z.to_nat (word.unsigned w)) = (word.unsigned w).
+      Z.of_nat (Z.to_nat (Zmod.unsigned w)) = (Zmod.unsigned w).
     Proof.
-      pose proof word.unsigned_range w.
+      pose proof bits.unsigned_range w width_nonneg.
       rewrite Z2Nat.id; intuition.
     Qed.
 
     Lemma of_Z_of_nat_to_nat_unsigned w:
-      word.of_Z (Z.of_nat (Z.to_nat (word.unsigned w))) = w.
+      bits.of_Z width (Z.of_nat (Z.to_nat (Zmod.unsigned w))) = w.
     Proof.
-      pose proof word.unsigned_range w.
-      rewrite Z2Nat.id, word.of_Z_unsigned; intuition.
+      pose proof bits.unsigned_range w width_nonneg.
+      rewrite Z2Nat.id, Zmod.of_Z_unsigned; intuition.
     Qed.
 
     (* FIXME make this a definition *)
     Notation word_of_byte b :=
-      (word.of_Z (Byte.byte.unsigned b)).
+      (bits.of_Z width (Byte.byte.unsigned b)).
 
     Notation byte_of_word w :=
-      (byte.of_Z (word.unsigned w)).
+      (byte.of_Z (Zmod.unsigned w)).
 
     Lemma byte_of_Z_unsigned b:
       byte.of_Z (byte.unsigned b) = b.
     Proof. destruct b; reflexivity. Qed.
 
     Lemma word_of_byte_range b:
-      0 <= @word.unsigned _ word (word_of_byte b) < 256.
+      0 <= Zmod.unsigned (word_of_byte b) < 256.
     Proof.
       pose proof Byte.to_N_bounded b as H256%N2Z.inj_le.
-      pose proof word.unsigned_range (word_of_byte b).
       unfold Byte.byte.unsigned.
-      rewrite word.unsigned_of_Z; unfold word.wrap.
-      destruct (Z_lt_le_dec 256 (2 ^ width)).
-      - rewrite Z.mod_small; lia.
-      - pose proof Z.mod_pos_bound (Z.of_N (Byte.to_N b)) (2 ^ width) ltac:(lia).
-        lia.
+      rewrite bits.unsigned_of_Z_small; [ lia | ].
+      destruct width_cases as [-> | ->]; lia.
     Qed.
 
-    Definition b2w (b: bool) :=
-      (@word.of_Z _ word (Z.b2z b)).
+    Definition b2w (b: bool) : word :=
+      bits.of_Z width (Z.b2z b).
 
     Lemma b2w_if (b: bool) :
-      b2w b = if b then word.of_Z 1 else word.of_Z 0.
+      b2w b = if b then Zmod.one else Zmod.zero.
     Proof. destruct b; reflexivity. Qed.
+
+    Lemma unsigned_b2w b:
+      Zmod.unsigned (b2w b) = Z.b2z b.
+    Proof.
+      unfold b2w; apply bits.unsigned_of_Z_small.
+      destruct b, width_cases as [-> | ->]; cbn; lia.
+    Qed.
 
     Lemma b2w_inj:
       forall b1 b2, b2w b1 = b2w b2 -> b1 = b2.
     Proof.
-      unfold b2w; intros [|] [|]; simpl;
-        intros H%(f_equal word.unsigned);
-        rewrite ?word.unsigned_of_Z_0, ?word.unsigned_of_Z_1 in H;
-        cbn; congruence.
+      intros [|] [|] H%(f_equal Zmod.unsigned);
+        rewrite !unsigned_b2w in H; cbn in H; congruence.
     Qed.
 
-    Lemma unsigned_b2w b:
-      word.unsigned (b2w b) = Z.b2z b.
-    Proof. apply unsigned_of_Z_b2z. Qed.
-
     Section MinMax.
-      Definition minu w1 w2 := if word.gtu w1 w2 then w2 else w1.
-      Definition mins w1 w2 := if word.gts w1 w2 then w2 else w1.
-      Definition maxu w1 w2 := if word.ltu w1 w2 then w2 else w1.
-      Definition maxs w1 w2 := if word.lts w1 w2 then w2 else w1.
+      Definition minu w1 w2 := if Semantics.ltu w2 w1 then w2 else w1.
+      Definition mins w1 w2 := if Semantics.lts w2 w1 then w2 else w1.
+      Definition maxu w1 w2 := if Semantics.ltu w1 w2 then w2 else w1.
+      Definition maxs w1 w2 := if Semantics.lts w1 w2 then w2 else w1.
 
       Ltac t :=
-        unfold minu, maxu, mins, maxs, word.gtu, word.gts, Z.min, Z.max;
-        intros; rewrite ?word.unsigned_ltu, ?word.signed_lts;
-        rewrite ?word.unsigned_of_Z_nowrap, ?word.signed_of_Z_nowrap by assumption;
+        unfold minu, maxu, mins, maxs, Semantics.ltu, Semantics.lts, Z.min, Z.max;
+        intros;
+        rewrite ?bits.unsigned_of_Z_small, ?bits.signed_of_Z by assumption;
+        rewrite ?(Z.smod_pow2_small _ _ width_pos)
+          by (rewrite (word.pow2_width_minus1 width_pos); lia);
         (rewrite Z.compare_antisym + idtac);
         rewrite Z.ltb_compare; destruct (_ ?= _);
-        simpl; rewrite ?word.of_Z_unsigned, ?word.of_Z_signed;
+        cbv beta iota delta [CompOpp]; rewrite ?Zmod.of_Z_unsigned, ?Zmod.of_Z_signed;
         reflexivity.
 
       Lemma unsigned_minu w1 w2 :
-        minu w1 w2 = word.of_Z (Z.min (word.unsigned w1) (word.unsigned w2)).
+        minu w1 w2 = bits.of_Z width (Z.min (Zmod.unsigned w1) (Zmod.unsigned w2)).
       Proof. t. Qed.
 
       Lemma unsigned_maxu w1 w2 :
-        maxu w1 w2 = word.of_Z (Z.max (word.unsigned w1) (word.unsigned w2)).
+        maxu w1 w2 = bits.of_Z width (Z.max (Zmod.unsigned w1) (Zmod.unsigned w2)).
       Proof. t. Qed.
 
       Lemma signed_mins w1 w2 :
-        mins w1 w2 = word.of_Z (Z.min (word.signed w1) (word.signed w2)).
+        mins w1 w2 = bits.of_Z width (Z.min (Zmod.signed w1) (Zmod.signed w2)).
       Proof. t. Qed.
 
       Lemma signed_maxs w1 w2 :
-        maxs w1 w2 = word.of_Z (Z.max (word.signed w1) (word.signed w2)).
+        maxs w1 w2 = bits.of_Z width (Z.max (Zmod.signed w1) (Zmod.signed w2)).
       Proof. t. Qed.
 
       Lemma minu_unsigned w1 w2 :
-        word.unsigned (minu w1 w2) = Z.min (word.unsigned w1) (word.unsigned w2).
+        Zmod.unsigned (minu w1 w2) = Z.min (Zmod.unsigned w1) (Zmod.unsigned w2).
       Proof. t. Qed.
 
       Lemma maxu_unsigned w1 w2 :
-        word.unsigned (maxu w1 w2) = Z.max (word.unsigned w1) (word.unsigned w2).
+        Zmod.unsigned (maxu w1 w2) = Z.max (Zmod.unsigned w1) (Zmod.unsigned w2).
       Proof. t. Qed.
 
       Lemma mins_signed w1 w2 :
-        word.signed (mins w1 w2) = Z.min (word.signed w1) (word.signed w2).
+        Zmod.signed (mins w1 w2) = Z.min (Zmod.signed w1) (Zmod.signed w2).
       Proof. t. Qed.
 
       Lemma maxs_signed w1 w2 :
-        word.signed (maxs w1 w2) = Z.max (word.signed w1) (word.signed w2).
+        Zmod.signed (maxs w1 w2) = Z.max (Zmod.signed w1) (Zmod.signed w2).
       Proof. t. Qed.
 
       Lemma minu_of_Z z1 z2 :
         0 <= z1 < 2 ^ width -> 0 <= z2 < 2 ^ width ->
-        minu (word.of_Z z1) (word.of_Z z2) = word.of_Z (Z.min z1 z2).
+        minu (bits.of_Z width z1) (bits.of_Z width z2) = bits.of_Z width (Z.min z1 z2).
       Proof. t. Qed.
 
       Lemma maxu_of_Z z1 z2 :
         0 <= z1 < 2 ^ width -> 0 <= z2 < 2 ^ width ->
-        maxu (word.of_Z z1) (word.of_Z z2) = word.of_Z (Z.max z1 z2).
+        maxu (bits.of_Z width z1) (bits.of_Z width z2) = bits.of_Z width (Z.max z1 z2).
       Proof. t. Qed.
 
       Lemma mins_of_Z z1 z2 :
         - 2 ^ (width - 1) <= z1 < 2 ^ (width - 1) ->
         - 2 ^ (width - 1) <= z2 < 2 ^ (width - 1) ->
-        mins (word.of_Z z1) (word.of_Z z2) = word.of_Z (Z.min z1 z2).
+        mins (bits.of_Z width z1) (bits.of_Z width z2) = bits.of_Z width (Z.min z1 z2).
       Proof. t. Qed.
 
       Lemma maxs_of_Z z1 z2 :
         - 2 ^ (width - 1) <= z1 < 2 ^ (width - 1) ->
         - 2 ^ (width - 1) <= z2 < 2 ^ (width - 1) ->
-        maxs (word.of_Z z1) (word.of_Z z2) = word.of_Z (Z.max z1 z2).
+        maxs (bits.of_Z width z1) (bits.of_Z width z2) = bits.of_Z width (Z.max z1 z2).
       Proof. t. Qed.
     End MinMax.
 
     Ltac compile_binop_zzw_bitwise lemma :=
-      intros; cbn; apply word.unsigned_inj;
-      rewrite lemma, !word.unsigned_of_Z by lia;
-      unfold word.wrap; rewrite <- ?Z.land_ones by eauto using word.width_nonneg;
+      intros; apply Zmod.unsigned_inj;
+      rewrite lemma, !bits.unsigned_of_Z by lia;
+      rewrite <- ?Z.land_ones by eauto using width_nonneg;
       bitblast.Z.bitblast.
 
-    Lemma morph_not x :
-      word.of_Z (Z.lnot x) = word.not (word.of_Z x) :> word.
-    Proof. compile_binop_zzw_bitwise word.unsigned_not. Qed.
-
     Lemma morph_and x y:
-      word.of_Z (Z.land x y) = word.and (word.of_Z x) (word.of_Z y) :> word.
-    Proof. compile_binop_zzw_bitwise word.unsigned_and_nowrap. Qed.
+      bits.of_Z width (Z.land x y) = Zmod.and (bits.of_Z width x) (bits.of_Z width y).
+    Proof. compile_binop_zzw_bitwise bits.unsigned_and. Qed.
 
     Lemma morph_or x y:
-      word.of_Z (Z.lor x y) = word.or (word.of_Z x) (word.of_Z y) :> word.
-    Proof. compile_binop_zzw_bitwise word.unsigned_or_nowrap. Qed.
+      bits.of_Z width (Z.lor x y) = Zmod.or (bits.of_Z width x) (bits.of_Z width y).
+    Proof. compile_binop_zzw_bitwise bits.unsigned_or. Qed.
 
     Lemma morph_xor x y:
-      word.of_Z (Z.lxor x y) = word.xor (word.of_Z x) (word.of_Z y) :> word.
-    Proof. compile_binop_zzw_bitwise word.unsigned_xor_nowrap. Qed.
+      bits.of_Z width (Z.lxor x y) = Zmod.xor (bits.of_Z width x) (bits.of_Z width y).
+    Proof. compile_binop_zzw_bitwise bits.unsigned_xor. Qed.
 
     Lemma morph_shiftl z n:
       0 <= n < width ->
-      word.of_Z (Z.shiftl z n) = word.slu (word := word) (word.of_Z z) (word.of_Z n).
+      bits.of_Z width (Z.shiftl z n) = Semantics.slu (bits.of_Z width z) (bits.of_Z width n).
     Proof.
-      compile_binop_zzw_bitwise word.unsigned_slu_shamtZ.
-      rewrite ?Z.testbit_neg_r by assumption; reflexivity.
+      intros; apply Zmod.unsigned_inj.
+      rewrite Semantics.unsigned_slu_shamtZ, !bits.unsigned_of_Z, !Z.shiftl_mul_pow2 by lia.
+      Z.push_pull_mod; reflexivity.
     Qed.
 
     Lemma morph_shiftr z n:
       0 <= n < width ->
       0 <= z < 2 ^ width ->
-      word.of_Z (Z.shiftr z n) = word.sru (word := word) (word.of_Z z) (word.of_Z n).
+      bits.of_Z width (Z.shiftr z n) = Semantics.sru (bits.of_Z width z) (bits.of_Z width n).
     Proof.
-      intros; apply word.unsigned_inj.
-      rewrite word.unsigned_sru_shamtZ, !Z.shiftr_div_pow2 by lia.
-      rewrite !word.unsigned_of_Z_nowrap; try lia; try reflexivity.
+      intros; apply Zmod.unsigned_inj.
+      rewrite Semantics.unsigned_sru_shamtZ, !Z.shiftr_div_pow2 by lia.
+      rewrite !bits.unsigned_of_Z_small; try lia; try reflexivity.
       pose proof Z.pow_pos_nonneg 2 n.
       nia.
-    Qed.
-
-    Lemma morph_divu z1 z2:
-      0 <= z1 < 2 ^ width ->
-      0 < z2 < 2 ^ width ->
-      word.of_Z (Z.div z1 z2) = word.divu (word := word) (word.of_Z z1) (word.of_Z z2).
-    Proof.
-      intros; apply word.unsigned_inj.
-      rewrite word.unsigned_divu_nowrap.
-      all: rewrite !word.unsigned_of_Z_nowrap; try nia; try reflexivity.
     Qed.
 
     Lemma morph_lts x y:
       - 2 ^ (width - 1) <= x < 2 ^ (width - 1) ->
       - 2 ^ (width - 1) <= y < 2 ^ (width - 1) ->
-      (x <? y) = @word.lts _ word (word.of_Z x) (word.of_Z y).
+      (x <? y) = Z.ltb (Zmod.signed (bits.of_Z width x)) (Zmod.signed (bits.of_Z width y)).
     Proof.
-      intros; rewrite word.signed_lts, !word.signed_of_Z, !word.swrap_inrange; eauto.
+      pose proof (word.pow2_width_minus1 width_pos).
+      intros; rewrite !bits.signed_of_Z, !(Z.smod_pow2_small _ _ width_pos) by lia; reflexivity.
     Qed.
 
     Lemma morph_ltu x y:
       0 <= x < 2 ^ width ->
       0 <= y < 2 ^ width ->
-      (x <? y) = @word.ltu _ word (word.of_Z x) (word.of_Z y).
+      (x <? y) = Z.ltb (Zmod.unsigned (bits.of_Z width x)) (Zmod.unsigned (bits.of_Z width y)).
     Proof.
-      intros; rewrite word.unsigned_ltu, !word.unsigned_of_Z, !wrap_small; eauto.
+      intros; rewrite !bits.unsigned_of_Z_small by assumption; reflexivity.
     Qed.
 
     Lemma Z_land_wrap_l z1 z2:
       0 <= z2 < 2 ^ width ->
-      Z.land (word.wrap z1) z2 = Z.land z1 z2.
+      Z.land (z1 mod 2 ^ width) z2 = Z.land z1 z2.
     Proof.
-      pose proof word.width_pos.
-      intros; unfold word.wrap.
+      pose proof width_pos.
+      intros.
       rewrite <- Z.land_ones, <- Z.land_assoc by lia.
       rewrite (Z.land_comm _ z2), Z.land_ones by lia.
       rewrite Z.mod_small by lia.
@@ -827,60 +712,53 @@ Module word.
 
     Lemma Z_land_wrap_r z1 z2:
       0 <= z1 < 2 ^ width ->
-      Z.land z1 (word.wrap z2) = Z.land z1 z2.
+      Z.land z1 (z2 mod 2 ^ width) = Z.land z1 z2.
     Proof.
       intros; rewrite Z.land_comm at 1;
         rewrite Z_land_wrap_l by lia; apply Z.land_comm.
     Qed.
 
     Lemma of_Z_land_ones z :
-      word.of_Z (Z.land z (Z.ones width)) = word.of_Z (word := word) z.
+      bits.of_Z width (Z.land z (Z.ones width)) = bits.of_Z width z.
     Proof.
-      rewrite Z.land_ones by apply word.width_nonneg.
-      apply word.unsigned_inj; rewrite !word.unsigned_of_Z; unfold word.wrap.
-      Z.push_pull_mod; reflexivity.
+      rewrite Z.land_ones by apply width_nonneg.
+      apply bits.of_Z_mod.
     Qed.
 
     Lemma Z_land_ones_word_add (a b: word) :
-      Z.land (word.unsigned a + word.unsigned b) (Z.ones width) =
-        word.unsigned (word.add a b).
-    Proof. rewrite Z.land_ones, word.unsigned_add; reflexivity || apply word.width_nonneg. Qed.
+      Z.land (Zmod.unsigned a + Zmod.unsigned b) (Z.ones width) =
+        Zmod.unsigned (Zmod.add a b).
+    Proof. rewrite Z.land_ones, Zmod.unsigned_add; reflexivity || apply width_nonneg. Qed.
 
     Lemma Z_land_ones_rotate (a: word) b (Hrange: 0 < b < width) :
-      Z.land (Z.shiftl (word.unsigned a) b + Z.shiftr (word.unsigned a) (width - b)) (Z.ones width) =
-        word.unsigned (word.add (word.slu a (word.of_Z b)) (word.sru a (word.sub (word.of_Z width) (word.of_Z b)))).
+      Z.land (Z.shiftl (Zmod.unsigned a) b + Z.shiftr (Zmod.unsigned a) (width - b)) (Z.ones width) =
+        Zmod.unsigned (Zmod.add (Semantics.slu a (bits.of_Z width b)) (Semantics.sru a (Zmod.sub (bits.of_Z width width) (bits.of_Z width b)))).
     Proof.
-      rewrite Z.land_ones, word.unsigned_add by lia.
-      rewrite word.unsigned_slu, word.unsigned_sru, !word.unsigned_of_Z_nowrap.
-      unfold word.wrap; Z.push_pull_mod.
-      rewrite word.unsigned_sub, !word.unsigned_of_Z, !wrap_small.
-      reflexivity.
-      all: pose proof Zpow_facts.Zpower2_lt_lin width word.width_nonneg.
-      all: rewrite ?word.unsigned_sub, ?word.unsigned_of_Z_nowrap, ?wrap_small; lia.
+      pose proof Zpow_facts.Zpower2_lt_lin width width_nonneg.
+      rewrite <- Zmod.of_Z_sub, Z.land_ones, Zmod.unsigned_add by lia.
+      rewrite Semantics.unsigned_slu_shamtZ, Semantics.unsigned_sru_shamtZ by lia.
+      Z.push_pull_mod; reflexivity.
     Qed.
 
     Lemma of_Z_land_ones_rotate a b (Ha: 0 <= a < 2 ^ width) (Hb: 0 < b < width) :
-      word.of_Z (Z.land (Z.shiftl a b + Z.shiftr a (width - b)) (Z.ones width)) =
-        word.add (word := word)
-                 (word.slu (word.of_Z a) (word.of_Z b))
-                 (word.sru (word.of_Z a) (word.sub (word.of_Z width) (word.of_Z b))).
+      bits.of_Z width (Z.land (Z.shiftl a b + Z.shiftr a (width - b)) (Z.ones width)) =
+        Zmod.add (Semantics.slu (bits.of_Z width a) (bits.of_Z width b))
+                 (Semantics.sru (bits.of_Z width a) (Zmod.sub (bits.of_Z width width) (bits.of_Z width b))).
     Proof.
-      apply word.unsigned_inj.
-      rewrite word.unsigned_add, word.unsigned_slu, word.unsigned_sru_nowrap;
-        rewrite ?word.unsigned_sub, ?word.unsigned_of_Z_nowrap.
-      all: rewrite ?(wrap_small b), ?(wrap_small (width - b)).
-      unfold word.wrap; rewrite Z.land_ones by apply word.width_nonneg;
-        Z.push_pull_mod; reflexivity.
-      all: pose proof Zpow_facts.Zpower2_lt_lin width word.width_nonneg; try lia.
-      rewrite Z.land_ones by lia; apply Z.mod_pos_bound; lia.
+      pose proof Zpow_facts.Zpower2_lt_lin width width_nonneg.
+      apply Zmod.unsigned_inj.
+      rewrite <- Zmod.of_Z_sub, Zmod.unsigned_add, Semantics.unsigned_slu_shamtZ, Semantics.unsigned_sru_shamtZ by lia.
+      rewrite !(bits.unsigned_of_Z_small _ Ha).
+      rewrite Z.land_ones, bits.unsigned_of_Z by apply width_nonneg.
+      Z.push_pull_mod; reflexivity.
     Qed.
   End __.
 End word.
 
 Notation word_of_byte b :=
-  (word.of_Z (Byte.byte.unsigned b)).
+  (bits.of_Z _ (Byte.byte.unsigned b)).
 Notation byte_of_word w :=
-  (byte.of_Z (word.unsigned w)).
+  (byte.of_Z (Zmod.unsigned w)).
 
 Module SeparationLogic. (* FIXME move to bedrock2? *)
   Import Lift1Prop.
@@ -1020,24 +898,24 @@ End SeparationLogic.
 Export SeparationLogic.
 
 Section Byte.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width}.
-  Context {word_ok : word.ok word}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
 
   Lemma byte_morph_and b1 b2:
     word_of_byte (byte.and b1 b2) =
-    word.and (word := word) (word_of_byte b1) (word_of_byte b2).
+    Zmod.and (word_of_byte b1) (word_of_byte b2) :> word.
   Proof.
-    apply word.unsigned_inj.
-    rewrite word.unsigned_and_nowrap, !word.unsigned_of_Z, !wrap_byte_unsigned.
+    apply Zmod.unsigned_inj.
+    rewrite bits.unsigned_and, !bits.unsigned_of_Z, !wrap_byte_unsigned.
     rewrite byte_unsigned_land; reflexivity.
   Qed.
 
   Lemma byte_morph_xor b1 b2:
     word_of_byte (byte.xor b1 b2) =
-    word.xor (word := word) (word_of_byte b1) (word_of_byte b2).
+    Zmod.xor (word_of_byte b1) (word_of_byte b2) :> word.
   Proof.
-    apply word.unsigned_inj.
-    rewrite word.unsigned_xor_nowrap, !word.unsigned_of_Z, !wrap_byte_unsigned.
+    apply Zmod.unsigned_inj.
+    rewrite bits.unsigned_xor, !bits.unsigned_of_Z, !wrap_byte_unsigned.
     rewrite byte_unsigned_xor; reflexivity.
   Qed.
 End Byte.
@@ -1051,7 +929,8 @@ Section combine_split.
 End combine_split.
 
 Section Array.
-  Context {width : Z} {word : Word.Interface.word width} {word_ok : word.ok word}.
+  Context {width : Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
   Context {value} {Mem : map.map word value} {Mem_ok : map.ok Mem}.
   Context {T} (element : word -> T -> Mem -> Prop) (size : word).
 
@@ -1059,17 +938,17 @@ Section Array.
 
   Definition no_aliasing {A} (repr: word -> A -> Mem -> Prop) :=
     (forall a b p delta m R,
-        0 <= delta < word.unsigned size ->
-        ~ (repr p a * repr (word.add p (word.of_Z delta)) b * R)%sep m).
+        0 <= delta < Zmod.unsigned size ->
+        ~ (repr p a * repr (Zmod.add p (bits.of_Z width delta)) b * R)%sep m).
 
   Lemma array_max_length': forall addr xs (R: Mem -> Prop) m,
       (array element size addr xs * R)%sep m ->
       no_aliasing element ->
-      0 <= word.unsigned size < 2 ^ width ->
-      ~ word.unsigned size * Z.of_nat (length xs) > 2 ^ width.
+      0 <= Zmod.unsigned size < 2 ^ width ->
+      ~ Zmod.unsigned size * Z.of_nat (length xs) > 2 ^ width.
   Proof.
     unfold not; intros * H He **.
-    pose (max_len := Z.to_nat (2 ^ width / word.unsigned size)).
+    pose (max_len := Z.to_nat (2 ^ width / Zmod.unsigned size)).
     assert (max_len <= Datatypes.length xs)%nat as B. {
       apply Nat2Z.inj_le; subst max_len; rewrite Z2Nat.id;
         [ apply Z.div_le_upper_bound | ]; ZnWords.
@@ -1084,24 +963,24 @@ Section Array.
     SeparationLogic.seprewrite_in @array_cons H.
     (* FIXME: Find a way to shorten this proof *)
     rewrite A in H.
-    set (word.unsigned size * Z.of_nat max_len) as max_len_bytes in H.
-    set (word.add addr (word.of_Z max_len_bytes)) as base in H.
+    set (Zmod.unsigned size * Z.of_nat max_len) as max_len_bytes in H.
+    set (Zmod.add addr (bits.of_Z width max_len_bytes)) as base in H.
     replace (element addr) with
-        (element (word.add base (word.of_Z (word.unsigned (word.sub addr base))))) in H;
+        (element (Zmod.add base (bits.of_Z width (Zmod.unsigned (Zmod.sub addr base))))) in H;
       cycle 1.
     - f_equal.
-      apply word.unsigned_inj.
-      rewrite word.unsigned_add, word.of_Z_unsigned, word.unsigned_sub.
-      unfold word.wrap; Z.push_pull_mod.
-      erewrite <- (Z.mod_small (word.unsigned addr)) at 2 by apply word.unsigned_range.
+      apply Zmod.unsigned_inj.
+      rewrite Zmod.unsigned_add, Zmod.of_Z_unsigned, Zmod.unsigned_sub.
+      Z.push_pull_mod.
+      erewrite <- (Z.mod_small (Zmod.unsigned addr)) at 2 by apply (bits.unsigned_range _ width_nonneg).
       f_equal; lia.
     - eapply He; [ | ecancel_assumption ].
       subst base max_len_bytes max_len; rewrite Z2Nat.id by ZnWords.
-      rewrite word.unsigned_sub, word.unsigned_add, word.unsigned_of_Z.
-      unfold word.wrap; Z.push_pull_mod.
+      rewrite Zmod.unsigned_sub, Zmod.unsigned_add, bits.unsigned_of_Z.
+      Z.push_pull_mod.
       rewrite Z_mod_eq''.
       match goal with
-      | [  |- _ <= ?t < _ ] => replace t with (2 ^ width mod word.unsigned size mod 2 ^ width)
+      | [  |- _ <= ?t < _ ] => replace t with (2 ^ width mod Zmod.unsigned size mod 2 ^ width)
       end.
       + rewrite Z.mod_small; ZnWords.
       + etransitivity; [ | rewrite <- Z.mod_add with (b := 1) by ZnWords; reflexivity ].
@@ -1111,16 +990,18 @@ Section Array.
 
   Lemma array_max_length: forall addr xs (R: Mem -> Prop) m,
       no_aliasing element ->
-      0 < word.unsigned size ->
+      0 < Zmod.unsigned size ->
       (array element size addr xs * R)%sep m ->
-      word.unsigned size * Z.of_nat (length xs) <= 2 ^ width.
+      Zmod.unsigned size * Z.of_nat (length xs) <= 2 ^ width.
   Proof.
-    intros; eapply Znot_gt_le, array_max_length'; eauto using word.unsigned_range.
+    intros; pose proof (bits.unsigned_range size width_nonneg).
+    eapply Znot_gt_le, array_max_length'; eauto.
   Qed.
 End Array.
 
 Section Aliasing.
-  Context {width : Z} {word : Word.Interface.word width} {word_ok : word.ok word}.
+  Context {width : Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
   Context {Mem : map.map word byte} {Mem_ok : map.ok Mem}.
 
   Open Scope Z_scope.
@@ -1128,7 +1009,7 @@ Section Aliasing.
   Lemma bytes_per_word_range :
     0 < Memory.bytes_per_word width < 2 ^ width.
   Proof. (* FIXME: seriously?! *)
-    unfold Memory.bytes_per_word; pose proof word.width_pos.
+    unfold Memory.bytes_per_word; pose proof width_pos.
     split; [apply Z.div_str_pos; lia | ].
     apply Z.div_lt_upper_bound; try lia.
     apply Z.lt_add_lt_sub_r.
@@ -1144,28 +1025,24 @@ Section Aliasing.
     lia.
   Qed.
 
-  Context {BW: Bitwidth width}.
-
   Lemma scalar8_no_aliasing :
-    no_aliasing (word := word) (Mem := Mem) (word.of_Z 1) ptsto.
+    no_aliasing (Mem := Mem) Zmod.one ptsto.
   Proof.
     red; intros * h Hmem.
-    rewrite word.unsigned_of_Z_1 in h.
+    rewrite bits.unsigned_1 in h by (pose proof width_pos; lia).
     replace delta with 0 in * by lia.
-    replace (word.add p (word.of_Z 0)) with p in *; cycle 1.
-    - apply word.unsigned_inj;
-        rewrite word.unsigned_add, word.unsigned_of_Z_0, Z.add_0_r.
-      pose proof word.unsigned_range p; rewrite word.wrap_small by lia;
-        reflexivity.
-    - eapply ptsto_nonaliasing; eassumption.
+    rewrite Zmod.add_0_r in *.
+    eapply ptsto_nonaliasing; eassumption.
   Qed.
 End Aliasing.
 
 Section Semantics.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -1251,7 +1128,7 @@ Section Semantics.
   Lemma to_byte_of_byte_nowrap b:
     byte_of_word (word_of_byte b : word) = b.
   Proof.
-    rewrite word.unsigned_of_Z, word.wrap_small.
+    rewrite bits.unsigned_of_Z, Z.mod_small.
     - apply word.byte_of_Z_unsigned.
     - pose proof byte.unsigned_range b.
       destruct width_cases as [-> | ->]; lia.
@@ -1356,8 +1233,8 @@ Section Rupicola.
   Global Instance HasDefault_byte : HasDefault byte := Byte.x00.
   Global Instance HasDefault_Fin {n} : HasDefault (Fin.t (S n)) :=
     Fin.F1.
-  Global Instance HasDefault_word {width} {word : Interface.word width} : HasDefault word :=
-    word.of_Z 0.
+  Global Instance HasDefault_word {width} : HasDefault (bits width) :=
+    Zmod.zero.
 
   Class Convertible (T1 T2: Type) := cast: T1 -> T2.
   Global Instance Convertible_self {A}: Convertible A A := id.
@@ -1366,8 +1243,8 @@ Section Rupicola.
     fun b => Z.to_nat (byte.unsigned b).
   Global Instance Convertible_Fin_nat {n} : Convertible (Fin.t n) nat :=
     fun f => proj1_sig (Fin.to_nat f).
-  Global Instance Convertible_word_nat {width : Z} {word : word width} : Convertible word nat :=
-    fun w => Z.to_nat (word.unsigned w).
+  Global Instance Convertible_word_nat {width : Z} : Convertible (bits width) nat :=
+    fun w => Z.to_nat (Zmod.unsigned w).
 End Rupicola.
 
 (* TODO: should be upstreamed to coqutil *)

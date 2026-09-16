@@ -4,10 +4,12 @@ Require Import Rupicola.Examples.IO.Writer.
 Import Writer.
 
 Section Stdout.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -88,9 +90,9 @@ Section Stdout.
   Qed.
 
   Definition hello_world_src (y: word) : Writer word :=
-    let/n x := word.of_Z 1 in
+    let/n x := Zmod.one in
     let/! _ := write "hello, world!" in
-    let/n out := word.add x y in
+    let/n out := Zmod.add x y in
     mret out.
 
   Instance spec_of_hello_word : spec_of "hello_world" :=
@@ -116,6 +118,6 @@ End Stdout.
 (*
 From bedrock2 Require Import BasicC64Semantics NotationsCustomEntry.
 Require Import Rupicola.Lib.ToCString.
-Compute hello_world_br2fn (word := word).
-Compute ToCString.c_func ("hello_world", hello_world_br2fn (word := word)).
+Compute hello_world_br2fn (width := 64).
+Compute ToCString.c_func ("hello_world", hello_world_br2fn (width := 64)).
 *)

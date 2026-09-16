@@ -28,41 +28,43 @@ Instance Convertible_Fin_byte_5: Convertible (Fin.t 5) byte :=
   Convertible_Fin_byte (n := 5) ltac:(lia).
 
 Section __.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word byte}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word byte}.
+  Context {mem_ok : map.ok mem}.
 
   Lemma word_of_byte_of_fin {n} H (f: Fin.t n):
     word_of_byte (byte_of_fin_lt H f) =
-      word.of_Z (word := word) (Z.of_nat (proj1_sig (Fin.to_nat f))).
+      bits.of_Z width (Z.of_nat (proj1_sig (Fin.to_nat f))).
   Proof.
     unfold byte_of_fin_lt.
     destruct Fin.to_nat as (bn & Hf).
     generalize (eq_refl (Byte.of_nat bn)).
     destruct (Byte.of_nat bn) as [b|] at 2 3;
-      cbn -[word.of_Z]; intros Hb.
+      cbn -[Zmod.of_Z]; intros Hb.
     - apply Byte.to_of_nat in Hb; subst bn.
       rewrite Byte.to_nat_via_N, N_nat_Z; reflexivity.
     - destruct Nat.lt_irrefl.
   Qed.
 
   Lemma word_of_byte_sru_lt b:
-    (Z.to_nat (word.unsigned (word.sru (word := word) (word_of_byte b) (word.of_Z 3))) < 32)%nat .
+    (Z.to_nat (Zmod.unsigned (Semantics.sru (bits.of_Z width (byte.unsigned b)) 3)) < 32)%nat .
   Proof.
     pose proof width_at_least_32 as H32.
     pose proof Z.pow_le_mono_r 2 _ _ ltac:(lia) H32.
-    pose proof word.unsigned_range (word.sru (word_of_byte b) (word.of_Z 3)).
+    pose proof bits.unsigned_range (Semantics.sru (word_of_byte b) 3) width_nonneg.
     apply (Z2Nat.inj_lt _ (Z.of_nat 32)); [lia..|].
-    rewrite word.unsigned_sru_shamtZ, Z.shiftr_div_pow2 by lia.
+    rewrite Semantics.unsigned_sru_shamtZ, Z.shiftr_div_pow2 by lia.
     pose proof word.word_of_byte_range b; apply Z.div_lt_upper_bound; lia.
   Qed.
 End __.
 
 Require Export bedrock2.BasicC32Semantics.
 
-Coercion co_word_of_Z := word.of_Z (word := word).
+Coercion co_word_of_Z := Zmod.of_Z (2 ^ 32).
 Coercion co_word_of_byte (b: byte) : word := word_of_byte b.
 Coercion co_word_of_Fin {n} (f: Fin.t n) : word :=
-  word.of_Z (Z.of_nat (proj1_sig (Fin.to_nat f))).
+  bits.of_Z _ (Z.of_nat (proj1_sig (Fin.to_nat f))).
 
 #[export] Hint Unfold Convertible_Fin_byte : compiler_side_conditions.
 #[export] Hint Unfold Convertible_Fin_byte_5 : compiler_side_conditions.

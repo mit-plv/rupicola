@@ -793,8 +793,8 @@ Section FoldsAsLoops.
       induction l1; intros; simpl.
       - rewrite app_nil_r. reflexivity.
       - rewrite Nat2Z.id, nth_error_app2, Nat.sub_diag by lia.
-        rewrite List.assoc_app_cons, IHl1, app_length; simpl.
-        rewrite <- List.assoc_app_cons.
+        rewrite (List.app_assoc l0 [a] l1 : l0 ++ a :: l1 = _), IHl1, app_length; simpl.
+        rewrite <- (List.app_assoc _ [_] _).
         rewrite fold_left_app.
         simpl; repeat f_equal. lia.
     Qed.
@@ -881,8 +881,8 @@ Section FoldsAsLoops.
       induction xs; simpl; intros.
       - reflexivity.
       - rewrite Hrp.
-        rewrite (List.assoc_app_cons xs0 _ (f a)).
-        rewrite (List.assoc_app_cons xs0 (xs ++ xs1) (f a)).
+        rewrite (List.app_assoc xs0 [f a] _ : xs0 ++ f a :: _ = _).
+        rewrite (List.app_assoc xs0 [f a] (xs ++ xs1) : xs0 ++ f a :: (xs ++ xs1) = _).
         replace (zlen xs0 + 1) with (zlen (xs0 ++ [f a]))
           by (rewrite app_length, Nat2Z.inj_add; reflexivity).
         rewrite <- IHxs; reflexivity.
@@ -1078,8 +1078,8 @@ Section WithTok.
 End WithTok.
 
 Section with_parameters.
-  Context {width: Z} {word: word.word width}.
-  Context {word_ok : word.ok word}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
   Context {A: Type}
           (from to: word).
 
@@ -1087,11 +1087,11 @@ Section with_parameters.
     Context {to_Z: word -> Z}
             (to_Z_of_Z: forall l h w,
                 to_Z l <= w <= to_Z h ->
-                to_Z (word.of_Z w) = w).
+                to_Z (bits.of_Z width w) = w).
 
     Lemma ranged_for_w1 {idx}:
       to_Z from - 1 < idx < to_Z to ->
-      to_Z from - 1 < to_Z (word.of_Z idx) < to_Z to.
+      to_Z from - 1 < to_Z (bits.of_Z width idx) < to_Z to.
     Proof. intros; erewrite (to_Z_of_Z from to); lia. Qed.
 
     Section WithTok.
@@ -1100,7 +1100,7 @@ Section with_parameters.
                   (ExitToken.t * A)).
 
       Definition w_body_tok acc tok idx pr :=
-        body acc tok (word.of_Z idx) (ranged_for_w1 pr).
+        body acc tok (bits.of_Z width idx) (ranged_for_w1 pr).
 
       Definition ranged_for_w (a0: A) : A :=
         ranged_for (to_Z from) (to_Z to) w_body_tok a0.
@@ -1132,7 +1132,7 @@ Section with_parameters.
                   (ExitToken.t * A)).
 
       Definition nd_w_body_tok acc tok idx :=
-        body acc tok (word.of_Z idx).
+        body acc tok (bits.of_Z width idx).
 
       Definition nd_ranged_for_w (a0: A) : A :=
         nd_ranged_for (to_Z from) (to_Z to) nd_w_body_tok a0.
@@ -1162,7 +1162,7 @@ Section with_parameters.
                   A).
 
       Definition w_body acc idx pr :=
-        body acc (word.of_Z idx) (ranged_for_w1 pr).
+        body acc (bits.of_Z width idx) (ranged_for_w1 pr).
 
       Definition ranged_for_all_w (a0: A) : A :=
         ranged_for_all (to_Z from) (to_Z to) w_body a0.
@@ -1192,7 +1192,7 @@ Section with_parameters.
       Context (body: forall (acc: A) (idx: word), A).
 
       Definition nd_w_body acc idx :=
-        body acc (word.of_Z idx).
+        body acc (bits.of_Z width idx).
 
       Definition nd_ranged_for_all_w (a0: A) : A :=
         nd_ranged_for_all (to_Z from) (to_Z to) nd_w_body a0.
@@ -1219,12 +1219,12 @@ Section with_parameters.
 
   Section Unsigned.
     Lemma word_unsigned_of_Z_bracketed (l h : word) w :
-      word.unsigned l <= w <= word.unsigned h ->
-      @word.unsigned _ word (word.of_Z w) = w.
+      Zmod.unsigned l <= w <= Zmod.unsigned h ->
+      Zmod.unsigned (bits.of_Z width w) = w.
     Proof.
-      pose proof word.unsigned_range l.
-      pose proof word.unsigned_range h.
-      intros; rewrite word.unsigned_of_Z, word.wrap_small; lia.
+      pose proof bits.unsigned_range l width_nonneg.
+      pose proof bits.unsigned_range h width_nonneg.
+      intros; rewrite bits.unsigned_of_Z, Z.mod_small; lia.
     Qed.
 
     Definition ranged_for_u :=
@@ -1244,24 +1244,25 @@ Section with_parameters.
       ranged_for_all_w_ind word_unsigned_of_Z_bracketed.
 
     Definition nd_ranged_for_u :=
-      nd_ranged_for_w (to_Z := word.unsigned).
+      nd_ranged_for_w (to_Z := Zmod.unsigned).
     Definition nd_ranged_for_u_continued :=
-      nd_ranged_for_w_continued (to_Z := word.unsigned).
+      nd_ranged_for_w_continued (to_Z := Zmod.unsigned).
 
     Definition nd_ranged_for_all_u :=
-      nd_ranged_for_all_w (to_Z := word.unsigned).
+      nd_ranged_for_all_w (to_Z := Zmod.unsigned).
     Definition nd_ranged_for_all_u_continued :=
-      nd_ranged_for_all_w_continued (to_Z := word.unsigned).
+      nd_ranged_for_all_w_continued (to_Z := Zmod.unsigned).
   End Unsigned.
 
   Section Signed.
     Lemma word_signed_of_Z_bracketed (l h : word) w:
-      word.signed l <= w <= word.signed h ->
-      @word.signed _ word (word.of_Z w) = w.
+      Zmod.signed l <= w <= Zmod.signed h ->
+      Zmod.signed (bits.of_Z width w) = w.
     Proof.
-      pose proof word.signed_range l.
-      pose proof word.signed_range h.
-      intros; rewrite word.signed_of_Z, word.swrap_inrange; lia.
+      pose proof bits.signed_range' l width_ge_1.
+      pose proof bits.signed_range' h width_ge_1.
+      pose proof (word.pow2_width_minus1 width_pos).
+      intros; rewrite bits.signed_of_Z; apply (Z.smod_pow2_small _ _ width_pos); lia.
     Qed.
 
     Definition ranged_for_s :=
@@ -1281,31 +1282,32 @@ Section with_parameters.
       ranged_for_all_w_ind word_signed_of_Z_bracketed.
 
     Definition nd_ranged_for_s :=
-      nd_ranged_for_w (to_Z := word.signed).
+      nd_ranged_for_w (to_Z := Zmod.signed).
     Definition nd_ranged_for_s_continued :=
-      nd_ranged_for_w_continued (to_Z := word.signed).
+      nd_ranged_for_w_continued (to_Z := Zmod.signed).
 
     Definition nd_ranged_for_all_s :=
-      nd_ranged_for_all_w (to_Z := word.signed).
+      nd_ranged_for_all_w (to_Z := Zmod.signed).
     Definition nd_ranged_for_all_s_continued :=
-      nd_ranged_for_all_w_continued (to_Z := word.signed).
+      nd_ranged_for_all_w_continued (to_Z := Zmod.signed).
   End Signed.
 
   Definition wZ_must_pos (a: Z) {_ : Bitwidth width} :
     match Z_gt_dec a 0, Z_le_dec a (2 ^ 32 - 1) with
-    | left _, left _ => @word.unsigned _ word (word.of_Z a) > 0
+    | left _, left _ => Zmod.unsigned (bits.of_Z width a) > 0
     | _, _ => True
     end.
   Proof.
     destruct Z_le_dec, Z_gt_dec; [ | exact I .. ].
     assert (2 ^ 32 - 1 <= 2 ^ width - 1) by
         (destruct Bitwidth.width_cases as [-> | ->]; lia).
-    rewrite word.unsigned_of_Z, word.wrap_small; lia.
+    rewrite bits.unsigned_of_Z, Z.mod_small; lia.
   Qed.
 End with_parameters.
 
 Section with_parameters.
-  Context {width: Z} {word: word.word width} {word_ok : word.ok word}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
 
   Context {locals: map.map String.string word}.
   Lemma getmany0 (l : locals) t vt vx vy x y:
@@ -1322,7 +1324,6 @@ Section with_parameters.
     intros; eapply (map.getmany_of_list_get _ 1); eauto || reflexivity.
   Qed.
 
-  Context {BW: Bitwidth width}.
   Context {mem: map.map word Byte.byte}.
   Context {mem_ok : map.ok mem}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
@@ -1373,8 +1374,8 @@ Section with_parameters.
 
         (forall from a0 tr mem locals,
             loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
-            WeakestPrecondition.dexpr mem locals to_expr (word.of_Z to)) ->
+            map.get locals from_var = Some (bits.of_Z width from) /\
+            WeakestPrecondition.dexpr mem locals to_expr (bits.of_Z width to)) ->
 
         loop_pred from a0 tr mem locals ->
 
@@ -1429,14 +1430,14 @@ Section with_parameters.
           repeat apply conj; eauto using lt_wf, 0%nat.
 
         intros.
-        exists (word.of_Z 0); repeat apply conj.
+        exists Zmod.zero; repeat apply conj.
         - eexists; split; eauto.
           eapply WeakestPrecondition_dexpr_expr; eauto.
           pose proof Zlt_cases from to.
-          destruct signed; simpl;
+          destruct signed; cbn [Semantics.interp_binop Semantics.lts Semantics.ltu];
             rewrite <- ?word.morph_lts, <- ?word.morph_ltu by tauto;
             destruct (from <? to); reflexivity || lia.
-        - rewrite word.unsigned_of_Z_0; intros; exfalso; lia.
+        - rewrite Zmod.unsigned_0; intros; exfalso; lia.
         - intros. apply Hk.
           replace (Z.max from to) with from by lia.
           subst v. rewrite ranged_for_exit; eauto || lia. }
@@ -1467,13 +1468,13 @@ Section with_parameters.
         { (* loop test can be eval'd *)
           eexists; split; eauto.
           eapply WeakestPrecondition_dexpr_expr; [|eauto].
-          destruct signed; simpl;
+          destruct signed; cbn [Semantics.interp_binop Semantics.lts Semantics.ltu];
             rewrite <- ?word.morph_lts, <- ?word.morph_ltu by lia;
             reflexivity. }
         all:
           pose proof Zlt_cases from' to;
           intros Hnz; destruct (from' <? to);
-            try (rewrite ?word.unsigned_of_Z_0, ?word.unsigned_of_Z_1 in Hnz;
+            try (rewrite ?Zmod.unsigned_0, ?(bits.unsigned_1 width_ge_1) in Hnz;
                  congruence); [].
 
         { eapply WeakestPrecondition_weaken; cycle 1.
@@ -1575,12 +1576,12 @@ Section with_parameters.
 
         (forall from a0 tr mem locals,
             loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
-            WeakestPrecondition.dexpr mem locals to_expr (word.of_Z to)) ->
+            map.get locals from_var = Some (bits.of_Z width from) /\
+            WeakestPrecondition.dexpr mem locals to_expr (bits.of_Z width to)) ->
 
         (forall from from' acc tr mem locals,
             loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+            loop_pred from' acc tr mem (map.put locals from_var (bits.of_Z width from'))) ->
 
         loop_pred from a0 tr mem locals ->
 
@@ -1636,8 +1637,8 @@ Section with_parameters.
       eexists; split.
       eauto.
 
-      simpl. red. red. rewrite <- word.ring_morph_add.
-      rewrite (ExitToken.map_branch (fun z => word.of_Z (z + 1))).
+      simpl. red. red. rewrite <- Zmod.of_Z_add.
+      rewrite (ExitToken.map_branch (fun z => bits.of_Z width (z + 1))).
       ring_simplify (to - 1 + 1).
       rewrite <- ExitToken.map_branch.
       reflexivity.
@@ -1659,11 +1660,11 @@ Section with_parameters.
         {k: nlet_eq_k P v} {k_impl} {body_impl}
         (from_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var (word.of_Z from) in
-        let locals2 := map.put locals1 to_var (word.of_Z to) in
+        let locals1 := map.put locals from_var (bits.of_Z width from) in
+        let locals2 := map.put locals1 to_var (bits.of_Z width to) in
 
-        WeakestPrecondition.dexpr mem locals from_expr (word.of_Z from) ->
-        WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
+        WeakestPrecondition.dexpr mem locals from_expr (bits.of_Z width from) ->
+        WeakestPrecondition.dexpr mem locals1 to_expr (bits.of_Z width to) ->
 
         let lp from tok_acc tr mem locals :=
             let from := ExitToken.branch (fst tok_acc) (to - 1) from in
@@ -1671,12 +1672,12 @@ Section with_parameters.
 
         (forall from a0 tr mem locals,
             loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
-            map.get locals to_var = Some (word.of_Z to)) ->
+            map.get locals from_var = Some (bits.of_Z width from) /\
+            map.get locals to_var = Some (bits.of_Z width to)) ->
 
         (forall from from' acc tr mem locals,
             loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+            loop_pred from' acc tr mem (map.put locals from_var (bits.of_Z width from'))) ->
 
         loop_pred from a0 tr mem locals2 ->
 
@@ -1731,20 +1732,20 @@ Section with_parameters.
         {k: nlet_eq_k P v} {k_impl} {body_impl}
         (from_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var (word.of_Z from) in
-        let locals2 := map.put locals1 to_var (word.of_Z to) in
+        let locals1 := map.put locals from_var (bits.of_Z width from) in
+        let locals2 := map.put locals1 to_var (bits.of_Z width to) in
 
-        WeakestPrecondition.dexpr mem locals from_expr (word.of_Z from) ->
-        WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
+        WeakestPrecondition.dexpr mem locals from_expr (bits.of_Z width from) ->
+        WeakestPrecondition.dexpr mem locals1 to_expr (bits.of_Z width to) ->
 
         (forall from a0 tr mem locals,
             loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
-            map.get locals to_var = Some (word.of_Z to)) ->
+            map.get locals from_var = Some (bits.of_Z width from) /\
+            map.get locals to_var = Some (bits.of_Z width to)) ->
 
         (forall from from' acc tr mem locals,
             loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+            loop_pred from' acc tr mem (map.put locals from_var (bits.of_Z width from'))) ->
 
         loop_pred from a0 tr mem locals2 ->
 
@@ -1798,20 +1799,20 @@ Section with_parameters.
         {k: nlet_eq_k P v} {k_impl} {body_impl}
         (from_var to_var: string) (from_expr to_expr: expr) vars,
 
-        let locals1 := map.put locals from_var (word.of_Z from) in
-        let locals2 := map.put locals1 to_var (word.of_Z to) in
+        let locals1 := map.put locals from_var (bits.of_Z width from) in
+        let locals2 := map.put locals1 to_var (bits.of_Z width to) in
 
-        WeakestPrecondition.dexpr mem locals from_expr (word.of_Z from) ->
-        WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
+        WeakestPrecondition.dexpr mem locals from_expr (bits.of_Z width from) ->
+        WeakestPrecondition.dexpr mem locals1 to_expr (bits.of_Z width to) ->
 
         (forall from a0 tr mem locals,
             loop_pred from a0 tr mem locals ->
-            map.get locals from_var = Some (word.of_Z from) /\
-            map.get locals to_var = Some (word.of_Z to)) ->
+            map.get locals from_var = Some (bits.of_Z width from) /\
+            map.get locals to_var = Some (bits.of_Z width to)) ->
 
         (forall from from' acc tr mem locals,
             loop_pred from acc tr mem locals ->
-            loop_pred from' acc tr mem (map.put locals from_var (word.of_Z from'))) ->
+            loop_pred from' acc tr mem (map.put locals from_var (bits.of_Z width from'))) ->
 
         loop_pred from a0 tr mem locals2 ->
 
@@ -1862,12 +1863,12 @@ Section with_parameters.
     Context {signed: bool}.
 
     Context {to_Z: word -> Z}
-            (of_Z_to_Z: forall w, word.of_Z (to_Z w) = w)
+            (of_Z_to_Z: forall w, bits.of_Z width (to_Z w) = w)
             (to_Z_of_Z: forall l h w,
                 to_Z l <= w <= to_Z h ->
-                to_Z (word.of_Z w) = w)
+                to_Z (bits.of_Z width w) = w)
             {max: word -> word -> word}
-            (max_of_Z: forall w1 w2, max w1 w2 = word.of_Z (Z.max (to_Z w1) (to_Z w2))).
+            (max_of_Z: forall w1 w2, max w1 w2 = bits.of_Z width (Z.max (to_Z w1) (to_Z w2))).
 
     Lemma compile_ranged_for_w : forall A {tr mem locals functions}
           (from to: word)
@@ -1881,7 +1882,7 @@ Section with_parameters.
         (from_var to_var: string) vars,
 
         let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) from in
+            let from := ExitToken.branch (fst tok_acc) (Zmod.sub to Zmod.one) from in
             loop_pred from (snd tok_acc) tr mem locals in
 
         (forall from a0 tr mem locals,
@@ -1936,14 +1937,14 @@ Section with_parameters.
       intros ? ? ? ? ? ? ? ?.
       intros * Hl Hfromindep Hinit Hbody Hk.
       apply compile_ranged_for_with_auto_increment
-        with (loop_pred := fun z => loop_pred (word.of_Z z)).
+        with (loop_pred := fun z => loop_pred (bits.of_Z width z)).
 
       - rewrite of_Z_to_Z; eauto.
       - eauto.
       - rewrite of_Z_to_Z; eassumption.
       - eassumption.
       - intros.
-        assert (exists h, a = ranged_for' (to_Z from) (to_Z (word.of_Z from')) (w_body_tok from (word.of_Z from') to_Z_of_Z (wbody body pr h)) a0) as [h eqn].
+        assert (exists h, a = ranged_for' (to_Z from) (to_Z (bits.of_Z width from')) (w_body_tok from (bits.of_Z width from') to_Z_of_Z (wbody body pr h)) a0) as [h eqn].
         { unshelve eexists; subst a.
           { rewrite (to_Z_of_Z from to); lia. }
           unshelve apply ranged_for'_Proper; reflexivity || eauto.
@@ -1964,7 +1965,7 @@ Section with_parameters.
 
           intros * Hlp.
           * destruct (fst b1); simpl in *;
-              repeat rewrite ?word.ring_morph_add, ?word.ring_morph_sub, ?of_Z_to_Z;
+              repeat rewrite ?Zmod.of_Z_add, ?Zmod.of_Z_sub, ?of_Z_to_Z;
               eauto.
       - intros; eapply Hk.
         rewrite max_of_Z; eassumption.
@@ -1983,7 +1984,7 @@ Section with_parameters.
         (from_var to_var: string) vars,
 
         let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) from in
+            let from := ExitToken.branch (fst tok_acc) (Zmod.sub to Zmod.one) from in
             loop_pred from (snd tok_acc) tr mem locals in
 
         (forall from a0 tr mem locals,
@@ -2060,7 +2061,7 @@ Section with_parameters.
         WeakestPrecondition.dexpr mem locals1 to_expr to ->
 
         let lp from tok_acc tr mem locals :=
-            let from := ExitToken.branch (fst tok_acc) (word.sub to (word.of_Z 1)) from in
+            let from := ExitToken.branch (fst tok_acc) (Zmod.sub to Zmod.one) from in
             loop_pred from (snd tok_acc) tr mem locals in
 
         (forall from a0 tr mem locals,
@@ -2125,27 +2126,27 @@ Section with_parameters.
 
     Definition compile_ranged_for_u :=
       @compile_ranged_for_w_fresh
-        false _ word.of_Z_unsigned word_unsigned_of_Z_bracketed
+        false _ (Zmod.of_Z_unsigned (m := 2 ^ width)) word_unsigned_of_Z_bracketed
         word.maxu word.unsigned_maxu A tr m l functions from to
-        (conj (word.unsigned_range _) (word.unsigned_range _)).
+        (conj (bits.unsigned_range _ width_nonneg) (bits.unsigned_range _ width_nonneg)).
 
     Definition compile_ranged_for_s :=
       @compile_ranged_for_w_fresh
-        true _ word.of_Z_signed word_signed_of_Z_bracketed
+        true _ (Zmod.of_Z_signed (m := 2 ^ width)) word_signed_of_Z_bracketed
         word.maxs word.signed_maxs A tr m l functions from to
-        (conj (word.signed_range _) (word.signed_range _)).
+        (conj (bits.signed_range' _ width_ge_1) (bits.signed_range' _ width_ge_1)).
 
     Definition compile_ranged_for_u_continued :=
       @compile_ranged_for_w_continued
-        false _ word.of_Z_unsigned word_unsigned_of_Z_bracketed
+        false _ (Zmod.of_Z_unsigned (m := 2 ^ width)) word_unsigned_of_Z_bracketed
         word.maxu word.unsigned_maxu A tr m l functions from to
-        (conj (word.unsigned_range _) (word.unsigned_range _)).
+        (conj (bits.unsigned_range _ width_nonneg) (bits.unsigned_range _ width_nonneg)).
 
     Definition compile_ranged_for_s_continued :=
       @compile_ranged_for_w_continued
-        true _ word.of_Z_signed word_signed_of_Z_bracketed
+        true _ (Zmod.of_Z_signed (m := 2 ^ width)) word_signed_of_Z_bracketed
         word.maxs word.signed_maxs A tr m l functions from to
-        (conj (word.signed_range _) (word.signed_range _)).
+        (conj (bits.signed_range' _ width_ge_1) (bits.signed_range' _ width_ge_1)).
   End ranged_for_words.
 
   Section Maps.
@@ -2161,20 +2162,20 @@ Section with_parameters.
         (idx_var to_var: string) (to_expr: expr),
 
         let to := Z.of_nat (length a) in
-        let locals1 := map.put locals idx_var (word.of_Z 0) in
-        let locals2 := map.put locals1 to_var (word.of_Z to) in
+        let locals1 := map.put locals idx_var Zmod.zero in
+        let locals2 := map.put locals1 to_var (bits.of_Z width to) in
 
         0 <= to < 2^width ->
-        WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
+        WeakestPrecondition.dexpr mem locals1 to_expr (bits.of_Z width to) ->
 
         (forall idx a0 tr mem locals,
             loop_pred idx a0 tr mem locals ->
-            map.get locals idx_var = Some (word.of_Z idx) /\
-            map.get locals to_var = Some (word.of_Z to)) ->
+            map.get locals idx_var = Some (bits.of_Z width idx) /\
+            map.get locals to_var = Some (bits.of_Z width to)) ->
 
         (forall idx idx' acc tr mem locals,
             loop_pred idx acc tr mem locals ->
-            loop_pred idx' acc tr mem (map.put locals idx_var (word.of_Z idx'))) ->
+            loop_pred idx' acc tr mem (map.put locals idx_var (bits.of_Z width idx'))) ->
 
         loop_pred 0 a tr mem locals2 ->
 
@@ -2232,20 +2233,20 @@ Section with_parameters.
         (idx_var to_var: string) (to_expr: expr),
 
         let to := Z.of_nat (length bs) in
-        let locals1 := map.put locals idx_var (word.of_Z 0) in
-        let locals2 := map.put locals1 to_var (word.of_Z to) in
+        let locals1 := map.put locals idx_var Zmod.zero in
+        let locals2 := map.put locals1 to_var (bits.of_Z width to) in
 
         0 <= to < 2^width ->
-        WeakestPrecondition.dexpr mem locals1 to_expr (word.of_Z to) ->
+        WeakestPrecondition.dexpr mem locals1 to_expr (bits.of_Z width to) ->
 
         (forall idx a0 tr mem locals,
             loop_pred idx a0 tr mem locals ->
-            map.get locals idx_var = Some (word.of_Z idx) /\
-            map.get locals to_var = Some (word.of_Z to)) ->
+            map.get locals idx_var = Some (bits.of_Z width idx) /\
+            map.get locals to_var = Some (bits.of_Z width to)) ->
 
         (forall idx idx' acc tr mem locals,
             loop_pred idx acc tr mem locals ->
-            loop_pred idx' acc tr mem (map.put locals idx_var (word.of_Z idx'))) ->
+            loop_pred idx' acc tr mem (map.put locals idx_var (bits.of_Z width idx'))) ->
 
         loop_pred 0 a tr mem locals2 ->
 
@@ -2384,7 +2385,7 @@ End LoopCompiler.
 
 Section Examples.
   Context {width: Z} {BW: Bitwidth width}.
-  Context {word: word.word width} {word_ok : word.ok word}.
+  Local Notation word := (bits width).
   Context {locals: map.map string word} {locals_ok : map.ok locals}.
   Context {mem: map.map word byte} {mem_ok : map.ok mem}.
 

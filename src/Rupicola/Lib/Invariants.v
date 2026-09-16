@@ -60,17 +60,17 @@ Ltac infer_word_instance locals :=
   lazymatch type of locals with
   | map.rep (map := ?ls) =>
     lazymatch type of ls with
-    | context [(word.rep (word := ?W))] => constr:(W)
+    | context [Zmod (2 ^ ?W)] => constr:(W)
     end
   end.
 
 Ltac check_scalar W repl :=
   lazymatch type of repl with
-  | word.rep => constr:(Some repl)
-  | Z => constr:(Some (word.of_Z (word := W) repl))
-  | nat => constr:(Some (word.of_Z (word := W) (Z.of_nat repl)))
-  | bool => constr:(Some (word.b2w (word := W) repl))
-  | Init.Byte.byte => constr:(Some (word.of_Z (word := W) (byte.unsigned repl)))
+  | Zmod _ => constr:(Some repl)
+  | Z => constr:(Some (bits.of_Z W repl))
+  | nat => constr:(Some (bits.of_Z W (Z.of_nat repl)))
+  | bool => constr:(Some (word.b2w (width := W) repl))
+  | Init.Byte.byte => constr:(Some (bits.of_Z W (byte.unsigned repl)))
   | _ => constr:(@None unit)
   end.
 
@@ -139,7 +139,7 @@ Ltac _infer_predicate_from_context k :=
 
 Section Examples.
   Context {width: Z} {BW: Bitwidth width}.
-  Context {word: word.word width} {word_ok : word.ok word}.
+  Local Notation word := (bits width).
   Context {locals: map.map string word} {locals_ok : map.ok locals}.
   Context {mem: map.map word byte} {mem_ok : map.ok mem}.
 

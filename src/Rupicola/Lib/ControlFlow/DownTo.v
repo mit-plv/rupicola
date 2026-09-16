@@ -29,7 +29,7 @@ Section Gallina.
       Nat.iter n f a = downto' a i (i + n) (fun a _ => f a).
   Proof.
     unfold downto'.
-    setoid_rewrite skipn_seq_step.
+    setoid_rewrite List.skipn_seq.
     setoid_rewrite (Nat.add_comm _ n); setoid_rewrite Nat.add_sub.
     simpl; induction n; simpl; intros.
     - reflexivity.
@@ -63,47 +63,46 @@ Definition cmd_downto_fresh i_var i_expr step_impl k_impl :=
                    k_impl).
 
 Section Compilation.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Implicit Types (x : word).
 
   (* helper lemma for subtracting one from the loop counter *)
   Lemma word_to_nat_sub_1 x n :
-    (0 < word.unsigned x)%Z ->
-    word.unsigned x = Z.of_nat n ->
-    word.unsigned (word.sub x (word.of_Z 1)) = Z.of_nat (n - 1).
+    (0 < Zmod.unsigned x)%Z ->
+    Zmod.unsigned x = Z.of_nat n ->
+    Zmod.unsigned (Zmod.sub x (bits.of_Z width 1)) = Z.of_nat (n - 1).
   Proof.
-    intros. pose proof (word.unsigned_range x).
+    intros. pose proof (bits.unsigned_range x width_nonneg).
     rewrite Nat2Z.inj_sub by lia.
-    rewrite word.unsigned_sub, word.unsigned_of_Z_1.
-    rewrite word.wrap_small by lia.
+    rewrite Zmod.unsigned_sub, Zmod.of_Z_1, (bits.unsigned_1 width_ge_1).
+    rewrite Z.mod_small by lia.
     f_equal. congruence.
   Qed.
 
   (* helper lemma for continuation case *)
   Lemma word_to_nat_0 x n :
-    (word.unsigned x <= 0)%Z ->
-    word.unsigned x = Z.of_nat n ->
-    x = word.of_Z 0.
+    (Zmod.unsigned x <= 0)%Z ->
+    Zmod.unsigned x = Z.of_nat n ->
+    x = Zmod.zero.
   Proof.
-    intros. pose proof (word.unsigned_range x).
-    rewrite <- (word.of_Z_unsigned x).
-    assert (n = 0) by lia; subst.
-    change (Z.of_nat 0) with 0%Z in *.
-    congruence.
+    intros. pose proof (bits.unsigned_range x width_nonneg).
+    apply Zmod.unsigned_inj; rewrite Zmod.unsigned_0; lia.
   Qed.
 
   Lemma word_of_Z_sub_1 n:
     n > 0 ->
-    word.of_Z (Z.of_nat (n - 1)) =
-    word.sub (word := word)
-             (word.of_Z (Z.of_nat n)) (word.of_Z 1).
+    bits.of_Z width (Z.of_nat (n - 1)) =
+    Zmod.sub
+             (bits.of_Z width (Z.of_nat n)) (bits.of_Z width 1).
   Proof.
-    intros; rewrite <- word.ring_morph_sub.
+    intros; rewrite <- Zmod.of_Z_sub.
     f_equal; lia.
   Qed.
 
@@ -118,12 +117,12 @@ Section Compilation.
 
         (forall i st tr mem locals,
             loop_pred i st tr mem locals ->
-            map.get locals i_var = Some (word.of_Z (Z.of_nat i))) ->
+            map.get locals i_var = Some (bits.of_Z width (Z.of_nat i))) ->
 
         ((* loop body *)
          forall tr l m i,
            let st := downto' a0 (S i) count step in
-           let wi := word.of_Z (Z.of_nat i) in
+           let wi := bits.of_Z width (Z.of_nat i) in
            loop_pred (S i) st tr m l ->
            i < count ->
            <{ Trace := tr;
@@ -170,10 +169,9 @@ Section Compilation.
 
     { repeat straightline'.
       repeat (eexists; split; repeat straightline; eauto).
-      rewrite word.unsigned_ltu, word.unsigned_of_Z_0.
-      rewrite word.unsigned_of_Z_nowrap by lia.
+      rewrite !bits.unsigned_of_Z_small by (pose proof modulus_pos; lia).
       destruct_one_match;
-        rewrite ?word.unsigned_of_Z_0, ?word.unsigned_of_Z_1;
+        rewrite ?Zmod.unsigned_0, ?(bits.unsigned_1 width_ge_1);
         ssplit; try lia; [ | ].
       { repeat straightline'.
         repeat (eexists; split; repeat straightline; eauto).
@@ -183,7 +181,7 @@ Section Compilation.
             Hinv : context [loop_pred ?i ?st]
           |- WeakestPrecondition.cmd
               _ ?impl ?tr ?mem
-              (map.put ?locals ?i_var (word.sub ?wi (word.of_Z 1)))
+              (map.put ?locals ?i_var (Zmod.sub ?wi (bits.of_Z _ 1)))
               ?post ] =>
           specialize (Hcmd tr locals mem (i - 1));
             replace (S (i-1)) with i in Hcmd by lia;
@@ -212,7 +210,7 @@ Section Compilation.
         i_var i_expr vars,
 
         let zcount := Z.of_nat count in
-        let wcount := word.of_Z zcount in
+        let wcount := bits.of_Z width zcount in
 
         (zcount < 2 ^ width)%Z ->
         WeakestPrecondition.dexpr mem locals i_expr wcount ->
@@ -222,13 +220,13 @@ Section Compilation.
 
         (forall i st tr mem locals,
             loop_pred i st tr mem locals ->
-            map.get locals i_var = Some (word.of_Z (Z.of_nat i))) ->
+            map.get locals i_var = Some (bits.of_Z width (Z.of_nat i))) ->
 
         (let lp := loop_pred in
          (* loop body *)
          forall tr l m i,
            let st := downto' a0 (S i) count step in
-           let wi := word.of_Z (Z.of_nat i) in
+           let wi := bits.of_Z width (Z.of_nat i) in
            loop_pred (S i) st tr m l ->
            i < count ->
            <{ Trace := tr;
@@ -269,7 +267,7 @@ Section Compilation.
         i_var i_expr vars,
 
         let zn := Z.of_nat n in
-        let wn := word.of_Z zn in
+        let wn := bits.of_Z width zn in
 
         (zn < 2 ^ width)%Z ->
         WeakestPrecondition.dexpr mem locals i_expr wn ->
@@ -279,13 +277,13 @@ Section Compilation.
 
         (forall i st tr mem locals,
             loop_pred i st tr mem locals ->
-            map.get locals i_var = Some (word.of_Z (Z.of_nat i))) ->
+            map.get locals i_var = Some (bits.of_Z width (Z.of_nat i))) ->
 
         (let lp := loop_pred in
          (* loop body *)
          forall tr l m i,
            let st := Nat.iter (n - S i) f a in
-           let wi := word.of_Z (Z.of_nat i) in
+           let wi := bits.of_Z width (Z.of_nat i) in
            loop_pred (S i) st tr m l ->
            i < n ->
            <{ Trace := tr;
@@ -363,10 +361,12 @@ Module DownToCompiler.
 End DownToCompiler.
 
 Section GhostCompilation.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
   Implicit Types (x : word).
@@ -411,7 +411,7 @@ Section GhostCompilation.
       Inv count ginit init tr mem (map.remove locals i_var) ->
 
       map.get locals i_var = Some wcount ->
-      word.unsigned wcount = Z.of_nat count ->
+      Zmod.unsigned wcount = Z.of_nat count ->
 
       (let v := v in
        (* loop iteration case *)
@@ -423,7 +423,7 @@ Section GhostCompilation.
              Inv i (ghost_step st gst i) v tr' mem' (map.remove locals i_var) in
          let gst' := ghost_step st gst i in
          Inv (S i) gst st tr m (map.remove l i_var) ->
-         word.unsigned wi = Z.of_nat i ->
+         Zmod.unsigned wi = Z.of_nat i ->
          i < count ->
          <{ Trace := tr;
             Memory := m;
@@ -435,7 +435,7 @@ Section GhostCompilation.
        (* continuation *)
        forall tr l m gst,
          Inv 0 gst v tr m (map.remove l i_var) ->
-         map.get l i_var = Some (word.of_Z 0) ->
+         map.get l i_var = Some Zmod.zero ->
          <{ Trace := tr;
             Memory := m;
             Locals := l;
@@ -466,7 +466,7 @@ Section GhostCompilation.
               Inv i gst st t m (map.remove l i_var)
               /\ i <= count
               /\ (exists wi,
-                     word.unsigned wi = Z.of_nat i
+                     Zmod.unsigned wi = Z.of_nat i
                      /\ map.get l i_var = Some wi)).
     ssplit; eauto using lt_wf; [ | ].
 
@@ -478,22 +478,22 @@ Section GhostCompilation.
 
     { intros. cleanup; subst.
       repeat straightline'.
-      lazymatch goal with x := context [word.ltu] |- _ => subst x end.
-      rewrite word.unsigned_ltu, word.unsigned_of_Z_0.
+      lazymatch goal with x := context [Z.ltb] |- _ => subst x end.
+      rewrite bits.unsigned_of_Z_small by (pose proof modulus_pos; lia).
       destruct_one_match;
-        rewrite ?word.unsigned_of_Z_0, ?word.unsigned_of_Z_1;
+        rewrite ?Zmod.unsigned_0, ?(bits.unsigned_1 width_ge_1);
         ssplit; try lia; [ | ].
       { repeat straightline'.
         subst_lets_in_goal.
         lazymatch goal with
         | Hcmd:context [ WeakestPrecondition.cmd _ ?impl ],
                Hinv : context [Inv _ (snd ?stgst) (fst ?stgst)],
-                      Hi : word.unsigned ?wi = Z.of_nat ?i
+                      Hi : Zmod.unsigned ?wi = Z.of_nat ?i
           |- WeakestPrecondition.cmd
                _ ?impl ?tr ?mem
-               (map.put ?locals ?i_var (word.sub ?wi (word.of_Z 1)))
+               (map.put ?locals ?i_var (Zmod.sub ?wi (bits.of_Z _ 1)))
                ?post =>
-          specialize (Hcmd tr locals mem (i-1) (word.sub wi (word.of_Z 1)));
+          specialize (Hcmd tr locals mem (i-1) (Zmod.sub wi (bits.of_Z width 1)));
             replace (S (i-1)) with i in Hcmd by lia;
             unshelve epose proof (Hcmd _ _ _); clear Hcmd
         end;
@@ -508,12 +508,12 @@ Section GhostCompilation.
       { repeat straightline'.
         rewrite @downto'_dependent_fst in *.
         match goal with
-        | H : (word.unsigned ?x <= 0)%Z |- _ =>
+        | H : (Zmod.unsigned ?x <= 0)%Z |- _ =>
           eapply word_to_nat_0 in H; [ | solve [eauto] .. ]; subst
         end.
         match goal with
-          H : word.unsigned (word.of_Z 0) = Z.of_nat ?n |- _ =>
-          assert (n = 0) by (rewrite word.unsigned_of_Z_0 in H; lia)
+          H : Zmod.unsigned Zmod.zero = Z.of_nat ?n |- _ =>
+          assert (n = 0) by (rewrite Zmod.unsigned_0 in H; lia)
         end; subst.
         use_hyp_with_matching_cmd; subst_lets_in_goal; eauto. } }
   Qed.

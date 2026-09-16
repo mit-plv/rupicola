@@ -2,15 +2,17 @@ Require Import Rupicola.Lib.Core.
 Require Import Rupicola.Lib.Notations.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
   (* To enable allocation of A terms via the predicate P, implement this class *)
-  Class Allocable {A} (P : word.rep -> A -> mem -> Prop) :=
+  Class Allocable {A} (P : word -> A -> mem -> Prop) :=
     {
     size_in_bytes : Z;
     size_in_bytes_mod
@@ -26,7 +28,7 @@ Section with_parameters.
 
   (* FIXME if we need to roundtrip:
 
-     Class Allocable {A} (P : word.rep -> A -> mem -> Prop) :=
+     Class Allocable {A} (P : word -> A -> mem -> Prop) :=
        { alloc_sz: Z;
          alloc_length_ok bs := Z.of_nat (List.length bs) = alloc_sz;
          alloc_sz_ok : alloc_sz mod Memory.bytes_per_word width = 0;
@@ -39,14 +41,14 @@ Section with_parameters.
          alloc_to_bytes_ok ptr bs:
            Lift1Prop.impl1
              (P ptr bs)
-             (array ptsto (word.of_Z 1) ptr (alloc_to_bytes bs));
+             (array ptsto Zmod.one ptr (alloc_to_bytes bs));
          alloc_of_bytes_ok ptr bs (Hlen: alloc_length_ok bs) :
            Lift1Prop.impl1
-             (array ptsto (word.of_Z 1) ptr bs)
+             (array ptsto Zmod.one ptr bs)
              (P ptr (alloc_of_bytes bs Hlen)) }.
 
      Lemma alloc_of_bytes_to_bytes
-           {A} (P : word.rep -> A -> mem -> Prop)
+           {A} (P : word -> A -> mem -> Prop)
            `{Allocable _ P} a Hlen:
        alloc_of_bytes (alloc_to_bytes a) Hlen = a.
      Proof. … Qed. *)
@@ -65,7 +67,7 @@ Section with_parameters.
 
   Lemma compile_stack {tr m l functions A} (v : A):
     forall {P} {pred: P v -> predicate} {k: nlet_eq_k P v} {k_impl}
-      {AP : word.rep -> A -> map.rep -> Prop} `{Allocable A AP}
+      {AP : word -> A -> map.rep -> Prop} `{Allocable A AP}
       (R: mem -> Prop) out_var,
 
       R m ->

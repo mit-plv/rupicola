@@ -5,10 +5,12 @@ Require Import Rupicola.Lib.WordNotations.
 Require Import coqutil.Word.LittleEndianList.
 
 Section with_parameters.
-  Context {width: Z} {BW: Bitwidth width} {word: word.word width} {mem: map.map word Byte.byte}.
+  Context {width: Z} {BW: Bitwidth width}.
+  Local Notation word := (bits width).
+  Context {mem: map.map word Byte.byte}.
   Context {locals: map.map String.string word}.
   Context {ext_spec: bedrock2.Semantics.ExtSpec}.
-  Context {word_ok : word.ok word} {mem_ok : map.ok mem}.
+  Context {mem_ok : map.ok mem}.
   Context {locals_ok : map.ok locals}.
   Context {ext_spec_ok : Semantics.ext_spec.ok ext_spec}.
 
@@ -36,7 +38,7 @@ Section with_parameters.
 
     Definition decr_gallina (p: packet) :=
       let/n ttl := (ttl p) in
-      let/n ttl := word.add ttl (word.of_Z (-1)) in
+      let/n ttl := Zmod.add ttl (bits.of_Z width (-1)) in
       let/n p := VectorArray.put p ttl_idx _lt ttl in
       p.
 
@@ -71,11 +73,11 @@ Section with_parameters.
       r.
 
     Definition incr_words (ws: ListArray.t word) :=
-      let/n ws := ListArray.map (word.add (word.of_Z 1)) ws in ws.
+      let/n ws := ListArray.map (Zmod.add Zmod.one) ws in ws.
 
     Definition sum_words (ws: ListArray.t word) :=
-      let/n r := word.of_Z 0 in
-      let/n r := ListArray.fold_left word.add ws r in
+      let/n r := Zmod.zero in
+      let/n r := ListArray.fold_left Zmod.add ws r in
       r.
 
     Import LoopCompiler.
@@ -88,8 +90,8 @@ Section with_parameters.
     Instance spec_of_mask_bytes : spec_of "mask_bytes" :=
       fnspec! "mask_bytes" ptr wlen wmask / (bs : ListArray.t byte) mask R,
         { requires tr mem :=
-            wmask = word.of_Z (byte.unsigned mask) /\
-            wlen = word.of_Z (Z.of_nat (length bs)) /\
+            wmask = bits.of_Z width (byte.unsigned mask) /\
+            wlen = bits.of_Z width (Z.of_nat (length bs)) /\
             Z.of_nat (length bs) < 2 ^ width /\
             (bytes (length bs) ptr bs ⋆ R) mem;
           ensures tr' mem' :=
@@ -107,11 +109,11 @@ Section with_parameters.
     Instance spec_of_xor_bytes : spec_of "xor_bytes" :=
       fnspec! "xor_bytes" ptr wlen / (bs : ListArray.t byte) R ~> r,
         { requires tr mem :=
-            wlen = word.of_Z (Z.of_nat (length bs)) /\
+            wlen = bits.of_Z width (Z.of_nat (length bs)) /\
             Z.of_nat (length bs) < 2 ^ width /\
             (bytes (length bs) ptr bs ⋆ R) mem;
           ensures tr' mem' :=
-            tr' = tr /\ r = word.of_Z (byte.unsigned (xor_bytes bs)) /\
+            tr' = tr /\ r = bits.of_Z width (byte.unsigned (xor_bytes bs)) /\
             (bytes (length bs) ptr bs ⋆ R) mem' }.
 
     Derive xor_bytes_br2fn SuchThat
@@ -125,7 +127,7 @@ Section with_parameters.
     Instance spec_of_incr_words : spec_of "incr_words" :=
       fnspec! "incr_words" ptr wlen / (ws : ListArray.t word) R,
         { requires tr mem :=
-            wlen = word.of_Z (Z.of_nat (length ws)) /\
+            wlen = bits.of_Z width (Z.of_nat (length ws)) /\
             Z.of_nat (length ws) < 2 ^ width /\
             (words (length ws) ptr ws ⋆ R) mem;
           ensures tr' mem' :=
@@ -143,11 +145,11 @@ Section with_parameters.
     Instance spec_of_sum_words : spec_of "sum_words" :=
       fnspec! "sum_words" ptr wlen / (ws : ListArray.t word) R ~> r,
         { requires tr mem :=
-            wlen = word.of_Z (Z.of_nat (length ws)) /\
+            wlen = bits.of_Z width (Z.of_nat (length ws)) /\
             Z.of_nat (length ws) < 2 ^ width /\
             (words (length ws) ptr ws ⋆ R) mem;
           ensures tr' mem' :=
-            tr' = tr /\ r = word.of_Z (word.unsigned (sum_words ws)) /\
+            tr' = tr /\ r = bits.of_Z width (Zmod.unsigned (sum_words ws)) /\
             (words (length ws) ptr ws ⋆ R) mem' }.
 
     Derive sum_words_br2fn SuchThat
@@ -160,15 +162,15 @@ Section with_parameters.
   End Loops.
 
   Section Casts.
-    Notation bytes := (listarray_value (memT := mem) (word := word) access_size.one).
-    Notation words := (listarray_value (memT := mem) (word := word) access_size.word).
+    Notation bytes := (listarray_value (memT := mem) access_size.one).
+    Notation words := (listarray_value (memT := mem) access_size.word).
 
-    Notation of_nat n := (word.of_Z (Z.of_nat n)).
-    Notation of_Z := word.of_Z.
-    Notation unsigned := word.unsigned.
+    Notation of_nat n := (bits.of_Z width (Z.of_nat n)).
+    Notation of_Z z := (bits.of_Z width z).
+    Notation unsigned := Zmod.unsigned.
 
-    Notation bs2ws := (bs2ws (word := word) (Memory.bytes_per (width := width) access_size.word)).
-    Notation ws2bs := (ws2bs (word := word) (Memory.bytes_per (width := width) access_size.word)).
+    Notation bs2ws := (bs2ws (width := width) (Memory.bytes_per (width := width) access_size.word)).
+    Notation ws2bs := (ws2bs (width := width) (Memory.bytes_per (width := width) access_size.word)).
     Notation bytes_per_word := (Memory.bytes_per (width := width) access_size.word).
 
 (*|
@@ -179,7 +181,7 @@ A simple program that takes as input an array of bytes, reinterprets it as an ar
       let/n r := 0 in
       let/n data := bs2ws data in
       let/n r := ListArray.fold_left (fun r w64 =>
-           let/n hit := word.eqb w64 needle in
+           let/n hit := Zmod.eqb w64 needle in
            let/n r := r + Z.b2z hit in
            r)
         data 0 in
@@ -262,9 +264,9 @@ Instead of applying the mask byte by byte, the program starts by casting its inp
 End with_parameters.
 
 From bedrock2 Require Import BasicC64Semantics NotationsCustomEntry.
-Compute decr_br2fn (word := word).
+Compute decr_br2fn (width := 64).
 Compute mask_bytes_br2fn (width := 64).
-Compute xor_bytes_br2fn (word := word).
-Compute incr_words_br2fn (word := word).
-Compute sum_words_br2fn (word := word).
-Compute count_ws_br2fn (word := word).
+Compute xor_bytes_br2fn (width := 64).
+Compute incr_words_br2fn (width := 64).
+Compute sum_words_br2fn (width := 64).
+Compute count_ws_br2fn (width := 64).
