@@ -294,7 +294,7 @@ Section with_parameters.
     Proof.
       intros; rewrite Hput by lia.
       change (val :: ?tl) with (List.app [val] tl).
-      rewrite List.app_assoc, List.skipn_app, List.skipn_all, List.app_nil_l, List.skipn_skipn;
+      rewrite List.app_assoc, List.skipn_app, List.skipn_all2, List.app_nil_l, List.skipn_skipn;
         rewrite !List.app_length, List.firstn_length_le, (Nat.add_comm _ 1) by lia.
       - rewrite Nat.sub_diag, Nat.add_0_l.
         reflexivity.
