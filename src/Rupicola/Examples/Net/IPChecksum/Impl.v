@@ -167,7 +167,12 @@ Section Properties.
         cbn [le_combine seq List.map].
         rewrite word.morph_or, Z.lor_0_r, word.morph_shiftl by lia.
         unfold word_onec_add16, ListArray.get, cast, Convertible_Z_nat.
-        repeat (lia || f_equal).
+        (* with words registered with zify (coqutil ZifyBits), [lia] no longer
+           fails fast on a word equality; decompose those with [f_equal] *)
+        repeat (lazymatch goal with
+                | |- @eq (Zmod _) _ _ => f_equal
+                | _ => lia || f_equal
+                end).
       }
     }
   Qed.
