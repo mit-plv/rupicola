@@ -14,7 +14,7 @@ Definition do_or_default {A B}
   end.
 
 Notation "'let/o'  x  :=  val  'goto_fail' default 'in'  body" :=
-  (do_or_default val (fun x => body) default) (at level 4).
+  (do_or_default val (fun x => body) default) (at level 4, body at level 200).
 
 #[export] Hint Extern 2 (IsRupicolaBinding (do_or_default (A := ?A) _ _ _)) =>
   exact (RupicolaBinding A []) : typeclass_instances.
