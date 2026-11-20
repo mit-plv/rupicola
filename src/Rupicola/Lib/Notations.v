@@ -311,7 +311,7 @@ Notation "name sig  {  impl  } ,  'implements'  fn" :=
         name constr at level 0,
         sig custom defn_spec_sig at level 0,
         impl constr at level 200,
-        fn constr at level 0,
+        fn constr at level 10,
         no associativity).
 
 Notation "name sig  {  impl  } ,  'implements'  fn  'using'  fns" :=
@@ -324,8 +324,8 @@ Notation "name sig  {  impl  } ,  'implements'  fn  'using'  fns" :=
         name constr at level 0,
         sig custom defn_spec_sig at level 0,
         impl constr at level 200,
-        fn constr at level 0,
-        fns constr at level 0,
+        fn constr at level 10,
+        fns constr at level 10,
         no associativity).
 
 Notation "defn! spec" :=
